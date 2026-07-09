@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Dickhead's Fantasy Football Form</title>
+<style>
+  :root{
+    --turf-dark:#122A1C;
+    --turf-mid:#1D4A30;
+    --turf-line:#2E6B45;
+    --chalk:#F4EFE2;
+    --chalk-dim:#E6DEC8;
+    --card:#FFFFFF;
+    --gold:#D4A017;
+    --gold-bright:#F0C242;
+    --endzone:#A32638;
+    --endzone-dim:#F4D9DC;
+    --ink:#191913;
+    --ink-soft:#5A5748;
+    --shadow: 0 10px 30px rgba(10,20,12,0.18);
+    --radius: 14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--turf-dark);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 60px);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;
+    padding-bottom:60px;
+    overflow-x:hidden;
+    -webkit-text-size-adjust:100%;
+  }
+  .display{
+    font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
+    text-transform:uppercase;
+    letter-spacing:0.02em;
+  }
+  .mono{ font-family:"SF Mono","Consolas","Menlo",monospace; }
+
+  .wrap{ max-width:640px; margin:0 auto; padding:0 16px; }
+
+  /* HEADER */
+  header.banner{
+    background: linear-gradient(180deg, var(--turf-mid), var(--turf-dark));
+    border-bottom:4px solid var(--gold);
+    padding:28px 16px 34px;
+    position:relative;
+    overflow:hidden;
+  }
+  header.banner::before{
+    content:"";
+    position:absolute; inset:0;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 46px);
+    pointer-events:none;
+  }
+  .banner-inner{ max-width:640px; margin:0 auto; position:relative; }
+  .eyebrow-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .league-tag{
+    color:var(--gold-bright); font-size:11px; letter-spacing:0.18em; font-weight:700;
+    font-family:"SF Mono","Consolas",monospace; white-space:nowrap;
+  }
+  .commish-link{
+    background:none; border:1px solid rgba(240,194,66,0.5); color:var(--chalk-dim);
+    font-size:11px; letter-spacing:0.08em; padding:7px 11px; border-radius:20px;
+    cursor:pointer; font-family:"SF Mono","Consolas",monospace; white-space:nowrap;
+    transition:all .15s ease;
+  }
+  .commish-link:hover{ border-color:var(--gold-bright); color:var(--gold-bright); }
+  h1.title{
+    color:var(--chalk); font-size:clamp(23px, 7.2vw, 32px); line-height:1.05; margin:0 0 8px; font-weight:900;
+  }
+  .subtitle{ color:var(--chalk-dim); font-size:14px; margin:0; opacity:0.85; padding-right:92px; }
+
+  .stamp{
+    position:absolute; bottom:2px; right:2px;
+    border:2.5px solid var(--endzone);
+    color:var(--endzone);
+    font-family:"SF Mono","Consolas",monospace;
+    font-weight:800; font-size:10px; letter-spacing:0.08em;
+    padding:6px 8px; border-radius:6px; transform:rotate(-8deg);
+    background:rgba(255,255,255,0.04); pointer-events:none;
+  }
+
+  /* FORM CARD */
+  main{ max-width:640px; margin:-16px auto 0; padding:0 16px; }
+  .card{
+    background:var(--card);
+    border-radius: var(--radius);
+    box-shadow:var(--shadow);
+    padding:20px 18px 26px;
+    margin-bottom:0;
+  }
+  .section{
+    padding:22px 0;
+    border-bottom:2px dashed #DAD3BE;
+    position:relative;
+  }
+  .section:first-of-type{ padding-top:4px; }
+  .section:last-of-type{ border-bottom:none; }
+  .down-tag{
+    display:inline-block;
+    background:var(--turf-mid);
+    color:var(--gold-bright);
+    font-family:"SF Mono","Consolas",monospace;
+    font-size:11px; font-weight:700; letter-spacing:0.12em;
+    padding:4px 9px; border-radius:5px; margin-bottom:10px;
+  }
+  .q-text{ font-size:16px; font-weight:700; color:var(--ink); margin:0 0 4px; line-height:1.35; }
+  .q-help{ font-size:13px; color:var(--ink-soft); margin:0 0 14px; line-height:1.4; }
+
+  select, textarea{
+    width:100%; font-size:16px; padding:12px 13px; border-radius:10px;
+    border:1.5px solid #D8D2C0; background:#FBF9F3; color:var(--ink);
+    font-family:inherit; max-width:100%;
+  }
+  textarea{ min-height:84px; resize:vertical; }
+  select:focus, textarea:focus{ outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold); }
+
+  /* CHIP RADIO (buy-in, locality, in-person) */
+  .chip-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .chip{
+    flex:1; min-width:84px; text-align:center;
+    padding:14px 10px; border-radius:10px; border:2px solid #D8D2C0;
+    background:#FBF9F3; cursor:pointer; font-weight:800; font-size:15px;
+    transition:all .12s ease; user-select:none;
+  }
+  .chip:active{ transform:scale(0.97); }
+  .chip.selected{ border-color:var(--turf-mid); background:var(--turf-mid); color:var(--chalk); }
+
+  .chip-sm{
+    padding:8px 12px; border-radius:20px; font-size:12.5px; font-weight:700;
+    border:1.5px solid #D8D2C0; background:#FBF9F3; cursor:pointer;
+  }
+  .chip-sm.selected{ border-color:var(--gold); background:var(--gold); color:var(--ink); }
+  .chip-sm.selected.virtual{ background:#EDEDED; border-color:#999; color:var(--ink-soft); }
+
+  /* WEEKEND ROWS */
+  .wk-row{
+    display:flex; flex-direction:column; gap:9px;
+    background:#FBF9F3; border:1.5px solid #E4DEC8; border-radius:10px;
+    padding:10px 12px; margin-bottom:8px;
+  }
+  .wk-top{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .wk-row.unavail{ background:var(--endzone-dim); border-color:#E3AEB4; }
+  .rank-badge{
+    width:26px; height:26px; min-width:26px; border-radius:50%;
+    background:var(--turf-mid); color:var(--chalk); font-family:"SF Mono",monospace;
+    font-weight:800; font-size:12px; display:flex; align-items:center; justify-content:center;
+  }
+  .wk-row.unavail .rank-badge{ background:var(--endzone); }
+  .wk-label{ flex:0 1 auto; min-width:130px; }
+  .wk-label .name{ font-weight:700; font-size:14.5px; display:block; white-space:nowrap; }
+  .wk-label .sub{ font-size:11.5px; color:var(--ink-soft); }
+  .oot-controls{ display:flex; align-items:center; gap:7px; padding-left:44px; flex-wrap:wrap; }
+  .oot-lbl{ font-size:11.5px; color:var(--ink-soft); }
+  .day-picker{
+    padding:11px; background:#fff; border:1.5px dashed #E0D9C4; border-radius:9px;
+    display:flex; flex-direction:column; gap:9px;
+  }
+  .day-picker-label{ font-size:12px; color:var(--ink-soft); }
+  .day-picker-label strong{ color:var(--endzone); }
+  .day-chips{ display:flex; flex-wrap:wrap; gap:7px; }
+  .day-chip{
+    padding:8px 12px; border-radius:8px; font-size:12.5px; font-weight:700; cursor:pointer;
+    border:1.5px solid #CFC8B2; background:#FBF9F3; color:var(--ink-soft);
+    transition:all .12s ease; user-select:none;
+  }
+  .day-chip:active{ transform:scale(0.96); }
+  .day-chip.cant{
+    background:var(--endzone); border-color:var(--endzone); color:#fff;
+    text-decoration:line-through; text-decoration-thickness:2px;
+  }
+  .whole-wk{
+    font-size:12px; font-weight:700; color:var(--endzone); cursor:pointer;
+    align-self:flex-start; user-select:none;
+  }
+  .drag-handle{
+    width:34px; height:42px; min-width:34px; display:flex; align-items:center; justify-content:center;
+    cursor:grab; touch-action:none; color:#A79F87; font-size:20px; letter-spacing:-2px;
+    user-select:none; border-radius:8px; transition:background .12s ease, color .12s ease;
+  }
+  .drag-handle:hover{ background:rgba(0,0,0,0.05); color:var(--turf-mid); }
+  .drag-handle:active{ cursor:grabbing; }
+  .drag-row{ position:relative; }
+  .drag-row.dragging{
+    box-shadow:0 10px 22px rgba(0,0,0,0.25);
+    z-index:50; cursor:grabbing;
+    transition:none !important; user-select:none;
+  }
+  .drag-row.dragging .unavail-btn,
+  .drag-row.dragging .day-chip,
+  .drag-row.dragging .whole-wk,
+  .drag-row.dragging .chip-sm{ pointer-events:none; }
+  .beef-row .drag-handle{ color:rgba(255,255,255,0.65); }
+  .beef-row .drag-handle:hover{ background:rgba(255,255,255,0.15); color:#fff; }
+  @keyframes rowpop{
+    0%{ transform:scale(1); }
+    45%{ transform:scale(1.035); }
+    100%{ transform:scale(1); }
+  }
+  .row-pop{ animation:rowpop .3s ease; }
+  .name-nag{
+    margin:12px 0 0; font-size:13px; line-height:1.5; color:var(--ink-soft);
+    background:#FBF3DD; border:1px solid #EBD9A6;
+    padding:11px 13px; border-radius:10px; font-weight:600;
+  }
+  .name-nag em{ font-style:normal; font-weight:900; letter-spacing:0.02em; color:var(--turf-mid); }
+  .name-nag .nag-second{ display:block; margin-top:7px; color:var(--turf-mid); font-weight:800; }
+  .name-nag.animate{ animation:nagIn .5s cubic-bezier(.2,.85,.3,1); }
+  @keyframes nagIn{
+    from{ opacity:0; transform:translateY(-8px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .unavail-btn{
+    font-size:11.5px; font-weight:800; padding:8px 11px; border-radius:8px; cursor:pointer;
+    border:1.5px solid var(--endzone); color:var(--endzone); background:#FFF3F4; white-space:nowrap;
+    transition:all .12s ease; margin-left:auto;
+  }
+  .unavail-btn:hover{ background:var(--endzone); color:#fff; }
+  .unavail-btn.active{ background:var(--endzone); color:#fff; }
+  .oot-controls{ margin-top:6px; }
+
+  .toggle-row{ display:flex; gap:10px; margin-bottom:16px; }
+
+  /* BEEF ROWS */
+  .beef-row{
+    display:flex; align-items:center; gap:10px; border-radius:10px;
+    padding:11px 12px; margin-bottom:8px; color:#fff;
+  }
+  .beef-row .name{ flex:1; font-weight:800; font-size:14.5px; }
+  .beef-row .flame{ font-size:13px; opacity:0.9; }
+
+  /* SUBMIT */
+  .submit-zone{ padding-top:20px; }
+  .error-msg{ color:var(--endzone); font-size:13px; font-weight:700; margin-bottom:10px; }
+  .lock-btn{
+    width:100%; padding:16px; border:none; border-radius:12px;
+    background:var(--gold); color:var(--ink); font-weight:900; font-size:16px;
+    letter-spacing:0.03em; cursor:pointer; box-shadow:0 6px 0 #A87C0F;
+    text-transform:uppercase;
+  }
+  .lock-btn:active{ transform:translateY(3px); box-shadow:0 3px 0 #A87C0F; }
+  .lock-btn:disabled{ opacity:0.6; cursor:default; }
+  .lock-btn.override{ background:var(--endzone); color:#fff; box-shadow:0 6px 0 #7A1B29; }
+  .lock-btn.override:active{ box-shadow:0 3px 0 #7A1B29; }
+  .override-note{
+    background:#FFF0F2; border:1px solid #F3C9CF; color:var(--endzone);
+    font-size:13px; font-weight:600; line-height:1.45; padding:11px 13px;
+    border-radius:10px; margin-bottom:12px; animation:nagIn .4s cubic-bezier(.2,.85,.3,1);
+  }
+  .dupe-note{
+    margin:10px 0 0; font-size:12.5px; line-height:1.45; color:#8A5A00;
+    background:#FDF3D6; border:1px solid #EAD08A; padding:10px 12px; border-radius:10px;
+    font-weight:600;
+  }
+  .dupe-note strong{ color:var(--endzone); }
+
+  /* SUCCESS */
+  .success-card{ text-align:center; padding:50px 20px; }
+  .stamp-big{
+    display:inline-block; border:4px solid var(--endzone); color:var(--endzone);
+    font-family:"SF Mono",monospace; font-weight:900; font-size:15px; letter-spacing:0.1em;
+    padding:14px 22px; border-radius:10px; transform:rotate(-6deg); margin-bottom:18px;
+  }
+  .success-card h2{ font-size:22px; margin:0 0 8px; }
+  .success-card p{ color:var(--ink-soft); font-size:14px; margin:0 0 20px; }
+  .edit-btn{
+    background:none; border:1.5px solid var(--turf-mid); color:var(--turf-mid);
+    padding:10px 18px; border-radius:20px; font-weight:700; font-size:13px; cursor:pointer;
+  }
+
+  /* RESULTS */
+  .res-card{
+    background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:18px; margin-bottom:14px;
+  }
+  .res-title{ font-size:12px; letter-spacing:0.1em; color:var(--turf-mid); font-weight:800; margin:0 0 12px; font-family:"SF Mono",monospace; }
+  .prog-line{ display:flex; justify-content:space-between; align-items:center; font-size:13px; margin-bottom:6px; }
+  .waiting{ font-size:12.5px; color:var(--ink-soft); }
+  .bar-row{ margin-bottom:10px; }
+  .bar-label{ display:flex; justify-content:space-between; font-size:13px; font-weight:700; margin-bottom:4px; }
+  .bar-track{ height:10px; background:#EDE8D9; border-radius:6px; overflow:hidden; }
+  .bar-fill{ height:100%; background:var(--turf-mid); border-radius:6px; }
+  .quote-item{ padding:9px 0; border-bottom:1px solid #EEE9DA; font-size:14px; }
+  .quote-item:last-child{ border-bottom:none; }
+  .quote-item .who{ font-weight:800; font-size:12px; color:var(--turf-mid); display:block; margin-bottom:2px; }
+  .wk-result{ display:flex; justify-content:space-between; align-items:center; padding:9px 0 4px; gap:10px; }
+  .wk-result .l{ font-weight:700; font-size:14px; }
+  .wk-result .r{ font-size:12px; color:var(--ink-soft); text-align:right; }
+  .wk-result-block{ padding:4px 0 10px; border-bottom:1px solid #EEE9DA; }
+  .wk-result-block:last-child{ border-bottom:none; }
+  .day-breakdown{ display:flex; flex-wrap:wrap; gap:6px; }
+  .day-stat{
+    font-size:11px; padding:3px 8px; border-radius:12px; background:#EFEAD9;
+    color:var(--ink-soft); font-weight:600;
+  }
+  .day-stat.has-out{ background:var(--endzone-dim); color:var(--endzone); }
+  .frontrunner{ background:var(--gold); color:var(--ink); font-size:10px; font-weight:800; padding:2px 6px; border-radius:5px; margin-left:6px; }
+  .lb-row{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #EEE9DA; }
+  .lb-row:last-child{ border-bottom:none; }
+  .lb-rank{ font-family:"SF Mono",monospace; font-weight:800; color:var(--ink-soft); width:20px; }
+  .lb-name{ flex:1; font-weight:700; font-size:14px; }
+  .empty-note{ color:var(--ink-soft); font-size:13px; text-align:center; padding:30px 10px; }
+  .back-link{ display:block; text-align:center; color:var(--chalk-dim); font-size:13px; margin-top:6px; cursor:pointer; text-decoration:underline; }
+
+  /* PIN VAULT */
+  .pin-card{ text-align:center; padding:26px 20px 22px; }
+  .pin-card.shake{ animation:pinShake .4s ease; }
+  @keyframes pinShake{
+    0%,100%{ transform:translateX(0); }
+    20%{ transform:translateX(-9px); }
+    40%{ transform:translateX(8px); }
+    60%{ transform:translateX(-6px); }
+    80%{ transform:translateX(4px); }
+  }
+  .pin-icon{ font-size:34px; margin-bottom:6px; }
+  .pin-title{ font-size:21px; margin:0 0 6px; font-weight:900; }
+  .pin-sub{ font-size:13px; color:var(--ink-soft); margin:0 auto 16px; max-width:340px; line-height:1.45; }
+  .pin-dots{ display:flex; justify-content:center; gap:14px; margin-bottom:8px; }
+  .pin-dot{ width:14px; height:14px; border-radius:50%; border:2px solid var(--turf-mid); background:transparent; transition:background .12s ease; }
+  .pin-dot.filled{ background:var(--turf-mid); }
+  .pin-msg{ font-size:12.5px; font-weight:800; margin:0 auto 12px; min-height:16px; max-width:330px; line-height:1.45; }
+  .pin-msg.placeholder{ color:transparent; }
+  .pin-msg.show{
+    color:var(--endzone); background:#FFF0F2; border:1px solid #F3C9CF;
+    padding:10px 13px; border-radius:11px;
+    animation:pinMsgIn .45s cubic-bezier(.2,.85,.3,1);
+  }
+  @keyframes pinMsgIn{
+    from{ opacity:0; transform:translateY(-7px) scale(0.96); }
+    to{ opacity:1; transform:translateY(0) scale(1); }
+  }
+  .pin-pad{ display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; max-width:280px; margin:0 auto 16px; }
+  .pin-key{
+    height:56px; border:1.5px solid #DCD5C2; background:#FBF9F3; border-radius:12px;
+    font-size:22px; font-weight:700; color:var(--ink); cursor:pointer; font-family:inherit;
+    transition:all .1s ease;
+  }
+  .pin-key:hover{ background:var(--turf-mid); color:var(--chalk); border-color:var(--turf-mid); }
+  .pin-key:active{ transform:scale(0.95); }
+  .pin-key.empty{ visibility:hidden; }
+  .pin-key.wide-key{ font-size:20px; }
+
+  /* MOBILE REFINEMENTS */
+  @media (max-width:480px){
+    .card{ padding:18px 15px 24px; }
+    .wk-result{ flex-direction:column; align-items:flex-start; gap:3px; }
+    .wk-result .r{ text-align:left; }
+    .oot-controls{ padding-left:0; }
+    .pin-sub{ font-size:12.5px; }
+    .quote-item{ word-break:break-word; }
+    .lb-name, .wk-label .name{ word-break:break-word; }
+  }
+  @media (hover:none){
+    .drag-handle:hover{ background:transparent; color:#A79F87; }
+    .pin-key:hover{ background:#FBF9F3; color:var(--ink); border-color:#DCD5C2; }
+    .commish-link:hover{ border-color:rgba(240,194,66,0.5); color:var(--chalk-dim); }
+    .unavail-btn:hover{ background:#FFF3F4; color:var(--endzone); }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const ROSTER = [
+  "Nikhil Nehra","Ryan Latin","Lyon Burns","Aidan Duncan","Stephen Comeaux",
+  "Jaswin Jabbal","Dhruv Nandwani","Sean Vargeese","Shishir Nambi","Mattew Yoshida",
+  "Pranav Chelat","Prabhas Dande","David Moton","Rayyan Ali"
+];
+const WEEKENDS = [
+  {id:'w1', label:'Aug 21–23', days:[
+    {id:'w1fri', short:'Fri Aug 21'},
+    {id:'w1sat', short:'Sat Aug 22'},
+    {id:'w1sun', short:'Sun Aug 23'}
+  ]},
+  {id:'w2', label:'Aug 28–30', days:[
+    {id:'w2fri', short:'Fri Aug 28'},
+    {id:'w2sat', short:'Sat Aug 29'},
+    {id:'w2sun', short:'Sun Aug 30'}
+  ]},
+  {id:'w3', label:'Sep 4–7', days:[
+    {id:'w3fri', short:'Fri Sep 4'},
+    {id:'w3sat', short:'Sat Sep 5'},
+    {id:'w3sun', short:'Sun Sep 6'},
+    {id:'w3mon', short:'Mon Sep 7 · Labor Day'}
+  ]}
+];
+const BUYINS = ['$25','$50','$100'];
+
+let state = {
+  view: 'form',
+  name: '',
+  buyIn: '',
+  punishment: '',
+  locality: '',
+  weekendOrder: WEEKENDS.map(w=>w.id),
+  cantMake: {},
+  expanded: {},
+  inPerson: {},
+  beefOrder: [],
+  submitting: false,
+  error: '',
+  resultsLoading: false,
+  results: null,
+  pinOk: false,
+  pinInput: '',
+  pinMsg: '',
+  alreadySubmitted: null,
+  overrideConfirm: false,
+  overrideNotice: false
+};
+
+function syncBeefOrder(){
+  const remaining = ROSTER.filter(n => n !== state.name);
+  if(!state.beefOrder.length){
+    state.beefOrder = remaining.slice();
+  } else {
+    const kept = state.beefOrder.filter(n => remaining.includes(n));
+    const missing = remaining.filter(n => !kept.includes(n));
+    state.beefOrder = kept.concat(missing);
+  }
+}
+syncBeefOrder();
+
+function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content; }
+
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  if(state.view === 'success'){ app.appendChild(renderSuccess()); return; }
+  if(state.view === 'pinlock'){ app.appendChild(renderHeader()); app.appendChild(renderPinlock()); state._pinShake=false; return; }
+  if(state.view === 'results'){ app.appendChild(renderHeader()); app.appendChild(renderResults()); return; }
+  app.appendChild(renderHeader());
+  app.appendChild(renderForm());
+}
+
+function renderHeader(){
+  return el(`
+    <header class="banner">
+      <div class="banner-inner">
+        <div class="stamp">OFFICIAL<br>LEAGUE DOC</div>
+        <div class="eyebrow-row">
+          <span class="league-tag">DRAFT SEASON · 2026</span>
+          <button class="commish-link" onclick="goResults()">${(state.view==='results'||state.view==='pinlock') ? 'BACK TO FORM' : "COMMISSIONER'S DESK →"}</button>
+        </div>
+        <h1 class="title display">The Dickhead's<br>Fantasy Football Form</h1>
+        <p class="subtitle">Fill it out. No exceptions. League business is not optional.</p>
+      </div>
+    </header>
+  `);
+}
+
+function goResults(){
+  if(state.view === 'results' || state.view === 'pinlock'){
+    state.view='form'; state.pinInput=''; state.pinMsg=''; render(); return;
+  }
+  if(state.pinOk){ state.view='results'; render(); loadResults(); return; }
+  state.view='pinlock'; state.pinInput=''; state.pinMsg=''; render();
+}
+
+const PIN_FAIL_MSG = "The dickhead commissioner is free on Friday from 8–12, if you're ready for a hot date.";
+
+function renderPinlock(){
+  const wrap = document.createElement('main');
+  const dots = [0,1,2,3].map(i=>`<span class="pin-dot ${i<state.pinInput.length?'filled':''}"></span>`).join('');
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  wrap.innerHTML = `
+    <div class="card pin-card ${state._pinShake?'shake':''}">
+      <div class="pin-icon">🔒</div>
+      <h2 class="pin-title">Commissioner's Vault</h2>
+      <p class="pin-sub">Four-digit code that only the dickhead commissioner knows. Maybe if you go on a date with him he might let it slip.</p>
+      <div class="pin-dots">${dots}</div>
+      ${state.pinMsg ? `<p class="pin-msg show">${state.pinMsg}</p>` : `<p class="pin-msg placeholder">&nbsp;</p>`}
+      <div class="pin-pad">
+        ${keys.map(k=> k==='' ? '<span class="pin-key empty"></span>'
+          : k==='⌫' ? '<button class="pin-key wide-key" onclick="pinDelete()">⌫</button>'
+          : `<button class="pin-key" onclick="pinPress('${k}')">${k}</button>`).join('')}
+      </div>
+      <span class="back-link" onclick="goResults()">← Back to the form</span>
+    </div>
+  `;
+  return wrap;
+}
+
+function pinPress(d){
+  if(state.pinInput.length >= 4) return;
+  state.pinInput += d;
+  state.pinMsg = '';
+  if(state.pinInput.length === 4){
+    if(state.pinInput === '7531'){
+      state.pinOk = true; state.pinInput = ''; state.view = 'results';
+      render(); loadResults(); return;
+    } else {
+      state.pinMsg = PIN_FAIL_MSG;
+      state.pinInput = '';
+      state._pinShake = true;
+    }
+  }
+  render();
+}
+function pinDelete(){ state.pinInput = state.pinInput.slice(0,-1); state.pinMsg=''; render(); }
+
+function renderForm(){
+  const wrap = document.createElement('main');
+  wrap.innerHTML = `
+    <div class="card">
+
+      <div class="section">
+        <div class="down-tag">STARTING LINEUP</div>
+        <p class="q-text">Who's filling this out?</p>
+        <select id="nameSelect">
+          <option value="">Select your name…</option>
+          ${ROSTER.map(n=>`<option value="${n}" ${state.name===n?'selected':''}>${n}</option>`).join('')}
+        </select>
+        ${state.name ? `<p class="name-nag${state._animateNag ? ' animate' : ''}"><span>I know you think you're <em>SO FUNNY</em> putting someone else's name, but please — I need your actual name for this (love you ❤️)</span><span class="nag-second">If this is your actual name, I love you 3000!</span></p>` : ''}
+        ${state.name && state.alreadySubmitted ? `<p class="dupe-note">This name already has a locked-in response. Submitting again will <strong>overwrite</strong> the previous one.</p>` : ''}
+      </div>
+
+      <div class="section">
+        <div class="down-tag">1ST DOWN</div>
+        <p class="q-text">How much should the buy-in be?</p>
+        <div class="chip-row">
+          ${BUYINS.map(b=>`<div class="chip ${state.buyIn===b?'selected':''}" onclick="setBuyIn('${b}')">${b}</div>`).join('')}
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="down-tag">2ND DOWN</div>
+        <p class="q-text">Write down at least one possible last-place punishment</p>
+        <p class="q-help">We'll vote on the winner later. Please be creative and diabolical.</p>
+        <textarea id="punishmentInput" placeholder="e.g. loser has to send a dick pic to their mother">${state.punishment}</textarea>
+      </div>
+
+      <div class="section">
+        <div class="down-tag">3RD DOWN</div>
+        <p class="q-text">When are you available for the draft?</p>
+        <p class="q-help">First, tell us where you're coming from — in town (Dallas) or out of town.</p>
+
+        <div class="toggle-row">
+          <div class="chip-sm ${state.locality==='local'?'selected':''}" onclick="setLocality('local')">📍 In town (Dallas)</div>
+          <div class="chip-sm ${state.locality==='oot'?'selected':''}" onclick="setLocality('oot')">✈️ Out of town</div>
+        </div>
+
+        ${state.locality ? `
+          <p class="q-help">Now drag the weekends by the ⠿ handle to rank them (top = your first choice). Can't do a whole weekend, or just certain days of it? Hit <strong>"Can't make it?"</strong> on that weekend to pick the exact dates you're out.${state.locality==='oot' ? " It'd be pretty cool if you came down for a weekend — for each one you can do, mark whether you'd be there in person or joining virtually." : ''}</p>
+          ${renderWeekendRows()}
+        ` : ''}
+      </div>
+
+      <div class="section">
+        <div class="down-tag">4TH DOWN</div>
+        <p class="q-text">Rivalry Selection</p>
+        <p class="q-help">This is for <strong>rivalry week</strong> (the last week of the season) — there may even be a mini group punishment or payout for the losing side of each rivalry. Who do you have the most beef with, or want to beat the most? Drag by the ⠿ handle to rank.</p>
+        ${renderBeefRows()}
+      </div>
+
+      <div class="section submit-zone">
+        ${state.error ? `<div class="error-msg">${state.error}</div>` : ''}
+        ${state.overrideNotice ? `<div class="override-note">You already have a response saved under <strong>${state.name}</strong>. Locking in now will overwrite it — tap again to confirm.</div>` : ''}
+        <button class="lock-btn ${state.overrideNotice?'override':''}" ${state.submitting?'disabled':''} onclick="submitForm()">${state.submitting ? 'Locking it in…' : (state.overrideNotice ? 'Overwrite my previous answer' : 'Lock It In 🔒')}</button>
+      </div>
+
+    </div>
+  `;
+  state._animateNag = false; // consume the one-shot animation flag
+  setTimeout(()=>{
+    const sel = document.getElementById('nameSelect');
+    if(sel) sel.onchange = (e)=>{
+      state.name = e.target.value;
+      state._animateNag = !!e.target.value;
+      state.overrideConfirm = false;
+      state.overrideNotice = false;
+      state.alreadySubmitted = null;
+      syncBeefOrder();
+      render();
+      checkAlreadySubmitted();
+    };
+    const pun = document.getElementById('punishmentInput');
+    if(pun) pun.oninput = (e)=>{ state.punishment = e.target.value; };
+  },0);
+  return wrap;
+}
+
+function renderWeekendRows(){
+  return state.weekendOrder.map((id, idx)=>{
+    const wk = WEEKENDS.find(w=>w.id===id);
+    const inPerson = state.inPerson[id] !== false;
+    const cantDays = wk.days.filter(d=>state.cantMake[d.id]);
+    const allOut = cantDays.length === wk.days.length;
+    const anyCant = cantDays.length > 0;
+    const expanded = !!state.expanded[id];
+
+    let summary;
+    if(cantDays.length === 0) summary = 'All dates open';
+    else if(allOut) summary = "Can't make this weekend";
+    else summary = 'Out: ' + cantDays.map(d=>d.short.split(' ')[0]).join(', ');
+
+    const btnLabel = expanded ? 'Done ✓' : (anyCant ? '📅 Edit dates' : "📅 Can't make it?");
+
+    return `
+      <div class="wk-row drag-row ${allOut?'unavail':''}" data-id="${id}">
+        <div class="wk-top">
+          <div class="drag-handle" onpointerdown="startDrag(event,'weekend')">⠿</div>
+          <div class="rank-badge">${allOut ? '0' : idx+1}</div>
+          <div class="wk-label">
+            <span class="name">${wk.label}</span>
+            <span class="sub">${summary}</span>
+          </div>
+          <button class="unavail-btn ${anyCant?'active':''}" onclick="toggleExpand('${id}')">${btnLabel}</button>
+        </div>
+
+        ${state.locality==='oot' && !allOut ? `
+          <div class="oot-controls">
+            <span class="oot-lbl">If you come:</span>
+            <span class="chip-sm ${inPerson?'selected':''}" onclick="setInPerson('${id}', true)">In person</span>
+            <span class="chip-sm ${!inPerson?'selected virtual':''}" onclick="setInPerson('${id}', false)">Virtual</span>
+          </div>` : ''}
+
+        ${expanded ? `
+          <div class="day-picker">
+            <span class="day-picker-label">Tap the dates you <strong>can't</strong> make:</span>
+            <div class="day-chips">
+              ${wk.days.map(d=>`<span class="day-chip ${state.cantMake[d.id]?'cant':''}" onclick="toggleDay('${d.id}')">${d.short}</span>`).join('')}
+            </div>
+            <span class="whole-wk" onclick="toggleWholeWeekend('${id}')">${allOut ? '↺ Actually I can make some' : "✕ Can't make any of this weekend"}</span>
+          </div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderBeefRows(){
+  const n = state.beefOrder.length;
+  return state.beefOrder.map((name, idx)=>{
+    const heat = n>1 ? 1 - idx/(n-1) : 1; // top row = hottest (most beef)
+    const hue = 210 - heat*210; // 0 (hot red) at top -> 210 (cool blue) at bottom
+    const bg = `hsl(${hue}, 60%, ${45 - heat*8}%)`;
+    const flameCount = Math.max(1, Math.round(heat*5));
+    return `
+      <div class="beef-row drag-row" data-id="${name}" style="background:${bg}">
+        <div class="drag-handle" onpointerdown="startDrag(event,'beef')">⠿</div>
+        <div class="lb-rank" style="color:rgba(255,255,255,0.85)">${idx+1}</div>
+        <div class="name">${name}</div>
+        <div class="flame">${'🔥'.repeat(flameCount)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function setBuyIn(b){ state.buyIn=b; render(); }
+function setLocality(l){ state.locality=l; render(); }
+function setInPerson(id, val){ state.inPerson[id]=val; render(); }
+function toggleExpand(id){ state.expanded[id] = !state.expanded[id]; render(); }
+function toggleDay(dayId){
+  if(state.cantMake[dayId]) delete state.cantMake[dayId];
+  else state.cantMake[dayId] = true;
+  render();
+}
+function toggleWholeWeekend(id){
+  const wk = WEEKENDS.find(w=>w.id===id);
+  const allOut = wk.days.every(d=>state.cantMake[d.id]);
+  wk.days.forEach(d=>{
+    if(allOut) delete state.cantMake[d.id];
+    else state.cantMake[d.id] = true;
+  });
+  render();
+}
+/* ---- FLIP animation: capture positions + colors before render, animate after ---- */
+function captureFlip(){
+  const map = {};
+  document.querySelectorAll('.drag-row').forEach(r=>{
+    const id = r.getAttribute('data-id');
+    const rect = r.getBoundingClientRect();
+    map[id] = { top: rect.top, bg: getComputedStyle(r).backgroundColor };
+  });
+  return map;
+}
+function playFlip(prev, movedId){
+  document.querySelectorAll('.drag-row').forEach(r=>{
+    const id = r.getAttribute('data-id');
+    const old = prev[id];
+    if(!old) return;
+    const rect = r.getBoundingClientRect();
+    const dy = old.top - rect.top;
+    const newBg = getComputedStyle(r).backgroundColor;
+
+    // start state: jump back to old position + old color, no transition
+    r.style.transition = 'none';
+    if(dy) r.style.transform = `translateY(${dy}px)`;
+    if(old.bg && old.bg !== newBg) r.style.backgroundColor = old.bg;
+
+    // force reflow so the start state is committed
+    void r.offsetHeight;
+
+    requestAnimationFrame(()=>{
+      r.style.transition = 'transform .28s cubic-bezier(.2,.7,.3,1), background-color .5s ease';
+      r.style.transform = 'translateY(0)';
+      if(old.bg && old.bg !== newBg) r.style.backgroundColor = newBg;
+      if(id === movedId) r.classList.add('row-pop');
+    });
+  });
+}
+
+/* ---- drag-to-reorder (pointer events, works for mouse + touch) ---- */
+let dragCtx = null;
+
+function startDrag(e, listKey){
+  if(dragCtx) return;                 // ignore a second pointer mid-drag
+  e.preventDefault();
+  const row = e.currentTarget.closest('.drag-row');
+  if(!row) return;
+  const handle = e.currentTarget;
+  try{ handle.setPointerCapture(e.pointerId); }catch(err){}
+  row.style.transition = 'none';      // no easing while it tracks the finger
+  row.classList.add('dragging');
+  dragCtx = { row, handle, listKey, pointerId: e.pointerId, baselineY: e.clientY };
+  // Bind to window (not the handle) so tracking survives the pointer leaving
+  // the small grip and works even when pointer capture isn't granted.
+  window.addEventListener('pointermove', onDragMove, { passive:false });
+  window.addEventListener('pointerup', onDragEnd);
+  window.addEventListener('pointercancel', onDragEnd);
+}
+
+function onDragMove(e){
+  if(!dragCtx || e.pointerId !== dragCtx.pointerId) return;
+  e.preventDefault();                 // stop the page scrolling under a touch drag
+  const { row } = dragCtx;
+  const list = row.parentElement;
+
+  // 1) follow the cursor continuously
+  row.style.transform = `translateY(${e.clientY - dragCtx.baselineY}px)`;
+
+  // 2) figure out where the row should sit, allowing it to jump past several rows at once
+  const allRows = Array.from(list.querySelectorAll('.drag-row'));
+  const currentIndex = allRows.indexOf(row);
+  const rowRect = row.getBoundingClientRect();
+  const rowCenter = rowRect.top + rowRect.height / 2;
+
+  let desired = 0;
+  for(const other of allRows){
+    if(other === row) continue;
+    const r = other.getBoundingClientRect();
+    if(rowCenter > r.top + r.height / 2) desired++;
+  }
+  if(desired === currentIndex) return; // already in the right place, nothing to do
+
+  // 3) move the DOM node, but stay within the draggable group (never below unavailable rows)
+  const others = allRows.filter(r => r !== row);
+  const anchor = others[desired]; // the row that should come *after* this one
+  const beforeTop = rowRect.top;
+  if(anchor) list.insertBefore(row, anchor);
+  else others[others.length - 1].after(row);
+
+  // 4) FLIP-pin: keep the row visually under the cursor across the DOM move
+  row.style.transform = 'none';
+  const afterTop = row.getBoundingClientRect().top;
+  const delta = beforeTop - afterTop;
+  row.style.transform = `translateY(${delta}px)`;
+  dragCtx.baselineY = e.clientY - delta;
+}
+
+function onDragEnd(e){
+  if(!dragCtx || (e.pointerId !== undefined && e.pointerId !== dragCtx.pointerId)) return;
+  const { row, handle, listKey, pointerId } = dragCtx;
+  window.removeEventListener('pointermove', onDragMove, { passive:false });
+  window.removeEventListener('pointerup', onDragEnd);
+  window.removeEventListener('pointercancel', onDragEnd);
+  row.classList.remove('dragging');
+  row.style.transform = '';
+  try{ handle.releasePointerCapture(pointerId); }catch(err){}
+
+  const list = row.parentElement;
+  const ids = Array.from(list.querySelectorAll('.drag-row')).map(r=>r.getAttribute('data-id'));
+  if(listKey === 'weekend') state.weekendOrder = ids;
+  else if(listKey === 'beef') state.beefOrder = ids;
+
+  dragCtx = null;
+  const prev = captureFlip();
+  render();
+  playFlip(prev, null);
+}
+
+async function checkAlreadySubmitted(){
+  if(!state.name){ state.alreadySubmitted = null; return; }
+  const who = state.name;
+  try{
+    const r = await window.storage.get('response:' + who, true);
+    if(state.name !== who) return; // name changed while awaiting
+    state.alreadySubmitted = !!(r && r.value);
+  }catch(e){
+    if(state.name === who) state.alreadySubmitted = false;
+  }
+  render();
+}
+
+async function submitForm(){
+  state.error = '';
+  if(!state.name){ state.error = 'Pick your name first.'; render(); return; }
+  if(!state.buyIn){ state.error = 'Vote on a buy-in amount.'; render(); return; }
+  if(!state.punishment || !state.punishment.trim()){ state.error = 'Give us at least one punishment idea.'; render(); return; }
+  if(!state.locality){ state.error = "Tell us if you're local or out of town."; render(); return; }
+  const totalDays = WEEKENDS.reduce((a,w)=>a+w.days.length,0);
+  const cantCount = Object.keys(state.cantMake).length;
+  if(cantCount >= totalDays){ state.error = 'You marked every single date as unavailable — leave at least one open.'; render(); return; }
+
+  // One entry per person: if a response already exists, make them confirm the overwrite.
+  if(!state.overrideConfirm){
+    state.submitting = true; render();
+    let exists = false;
+    try{
+      const r = await window.storage.get('response:' + state.name, true);
+      exists = !!(r && r.value);
+    }catch(e){ exists = false; }
+    state.submitting = false;
+    if(exists){
+      state.overrideConfirm = true;
+      state.overrideNotice = true;
+      state.alreadySubmitted = true;
+      render();
+      return;
+    }
+  }
+
+  state.overrideNotice = false;
+  state.submitting = true; render();
+
+  const payload = {
+    name: state.name,
+    buyIn: state.buyIn,
+    punishment: state.punishment.trim(),
+    locality: state.locality,
+    weekendOrder: state.weekendOrder,
+    cantMake: state.cantMake,
+    inPerson: state.inPerson,
+    beefOrder: state.beefOrder,
+    submittedAt: new Date().toISOString()
+  };
+
+  try{
+    await window.storage.set('response:' + state.name, JSON.stringify(payload), true);
+    state.submitting = false;
+    state.view = 'success';
+    render();
+  }catch(e){
+    state.submitting = false;
+    state.error = 'Something went wrong saving your response — try again.';
+    render();
+  }
+}
+
+function renderSuccess(){
+  const wrap = document.createElement('main');
+  wrap.innerHTML = `
+    <div class="card success-card">
+      <div class="stamp-big">OFFICIALLY<br>ENTERED</div>
+      <h2>You're locked in, ${state.name.split(' ')[0]}.</h2>
+      <p>Your answers are on record. The commissioner sees all.</p>
+      <button class="edit-btn" onclick="backToForm()">Make changes</button>
+    </div>
+  `;
+  return wrap;
+}
+function backToForm(){ state.view='form'; render(); }
+
+async function loadResults(){
+  state.resultsLoading = true;
+  const container = document.querySelector('.res-card.loading-target');
+  try{
+    const list = await window.storage.list('response:', true);
+    const keys = (list && list.keys) ? list.keys : [];
+    const responses = [];
+    for(const k of keys){
+      try{
+        const r = await window.storage.get(k, true);
+        if(r && r.value) responses.push(JSON.parse(r.value));
+      }catch(e){ /* skip bad key */ }
+    }
+    state.results = responses;
+  }catch(e){
+    state.results = [];
+  }
+  state.resultsLoading = false;
+  render();
+}
+
+function renderResults(){
+  const wrap = document.createElement('main');
+  if(state.resultsLoading || state.results===null){
+    wrap.innerHTML = `<div class="res-card"><p class="empty-note">Pulling the latest responses…</p></div>`;
+    return wrap;
+  }
+  const responses = state.results;
+  if(responses.length===0){
+    wrap.innerHTML = `<div class="res-card"><p class="empty-note">No one has locked in their answers yet.</p></div><span class="back-link" onclick="goResults()">← Back to the form</span>`;
+    return wrap;
+  }
+
+  const missing = ROSTER.filter(n => !responses.some(r=>r.name===n));
+
+  // Buy-in tally
+  const buyCounts = {}; BUYINS.forEach(b=>buyCounts[b]=0);
+  responses.forEach(r=>{ if(buyCounts[r.buyIn]!==undefined) buyCounts[r.buyIn]++; });
+  const maxBuy = Math.max(1, ...Object.values(buyCounts));
+
+  // Weekend stats (with per-day unavailability)
+  const wkStats = WEEKENDS.map(wk=>{
+    const dayIds = wk.days.map(d=>d.id);
+    const ranks = [];
+    let fullyOut = 0, inPersonCount = 0, virtualCount = 0;
+    const dayOut = {}; wk.days.forEach(d=>dayOut[d.id]=0);
+    responses.forEach(r=>{
+      const cm = r.cantMake || {};
+      wk.days.forEach(d=>{ if(cm[d.id]) dayOut[d.id]++; });
+      const allOut = dayIds.every(id=>cm[id]);
+      if(allOut){ fullyOut++; return; }
+      const idx = (r.weekendOrder||[]).indexOf(wk.id);
+      if(idx>=0) ranks.push(idx+1);
+      if(r.locality==='oot'){
+        if(r.inPerson && r.inPerson[wk.id]===false) virtualCount++; else inPersonCount++;
+      }
+    });
+    const avg = ranks.length ? (ranks.reduce((a,b)=>a+b,0)/ranks.length) : null;
+    return {wk, avg, available: ranks.length, fullyOut, dayOut, inPersonCount, virtualCount};
+  });
+  const rankedWk = wkStats.filter(s=>s.avg!==null).sort((a,b)=>a.avg-b.avg);
+  const bestAvg = rankedWk.length ? rankedWk[0].avg : null;
+
+  // Beef leaderboard
+  const beefScores = {};
+  ROSTER.forEach(n=>beefScores[n]=[]);
+  responses.forEach(r=>{
+    const order = r.beefOrder || [];
+    const n = order.length;
+    order.forEach((name, idx)=>{
+      const norm = n>1 ? idx/(n-1) : 0.5;
+      if(beefScores[name]) beefScores[name].push(norm);
+    });
+  });
+  const leaderboard = ROSTER.map(name=>{
+    const scores = beefScores[name];
+    const avg = scores.length ? scores.reduce((a,b)=>a+b,0)/scores.length : null;
+    return {name, avg, votes: scores.length};
+  }).filter(x=>x.avg!==null).sort((a,b)=>a.avg-b.avg);
+
+  wrap.innerHTML = `
+    <div class="res-card loading-target">
+      <p class="res-title">RESPONSES</p>
+      <div class="prog-line"><strong>${responses.length} / ${ROSTER.length}</strong> locked in</div>
+      ${missing.length ? `<p class="waiting">Still waiting on: ${missing.join(', ')}</p>` : `<p class="waiting">Everyone's in. 🏈</p>`}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">BUY-IN VOTE</p>
+      ${BUYINS.map(b=>`
+        <div class="bar-row">
+          <div class="bar-label"><span>${b}</span><span>${buyCounts[b]}</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(buyCounts[b]/maxBuy)*100}%"></div></div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">PUNISHMENT IDEAS</p>
+      ${responses.map(r=>`
+        <div class="quote-item"><span class="who">${r.name}</span>${escapeHtml(r.punishment)}</div>
+      `).join('')}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">DRAFT WEEKEND — RANKED BY PREFERENCE</p>
+      ${rankedWk.map(s=>`
+        <div class="wk-result-block">
+          <div class="wk-result">
+            <div class="l">${s.wk.label}${s.avg===bestAvg?'<span class="frontrunner">FRONTRUNNER</span>':''}</div>
+            <div class="r">avg rank ${s.avg.toFixed(1)} · ${s.available} in${s.fullyOut?` · ${s.fullyOut} out`:''}${(s.inPersonCount+s.virtualCount)>0?` · ${s.inPersonCount} in-person / ${s.virtualCount} virtual`:''}</div>
+          </div>
+          <div class="day-breakdown">
+            ${s.wk.days.map(d=>`<span class="day-stat ${s.dayOut[d.id]?'has-out':''}">${d.short.split(' ')[0]} ${d.short.split(' ').slice(1,3).join(' ')} · ${s.dayOut[d.id] ? s.dayOut[d.id]+' out' : 'clear'}</span>`).join('')}
+          </div>
+        </div>
+      `).join('')}
+      ${wkStats.filter(s=>s.avg===null).map(s=>`
+        <div class="wk-result-block">
+          <div class="wk-result"><div class="l">${s.wk.label}</div><div class="r">everyone's out this weekend</div></div>
+          <div class="day-breakdown">
+            ${s.wk.days.map(d=>`<span class="day-stat ${s.dayOut[d.id]?'has-out':''}">${d.short.split(' ')[0]} ${d.short.split(' ').slice(1,3).join(' ')} · ${s.dayOut[d.id] ? s.dayOut[d.id]+' out' : 'clear'}</span>`).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">BEEF LEADERBOARD — MOST TO LEAST</p>
+      ${leaderboard.map((p,i)=>`
+        <div class="lb-row">
+          <div class="lb-rank">${i+1}</div>
+          <div class="lb-name">${p.name}</div>
+          <div class="flame">${'🔥'.repeat(Math.max(1, Math.round((1 - i/(Math.max(1,leaderboard.length-1)))*5)))}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <span class="back-link" onclick="goResults()">← Back to the form</span>
+  `;
+  return wrap;
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+render();
+</script>
+</body>
+</html>
