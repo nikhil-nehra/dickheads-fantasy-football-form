@@ -244,7 +244,9 @@
     text-transform:uppercase;
   }
   .lock-btn:active{ transform:translateY(3px); box-shadow:0 3px 0 #A87C0F; }
-  .lock-btn:disabled{ opacity:0.6; cursor:default; }
+  .lock-btn:disabled{ background:#CFC9BA; color:#8A8676; box-shadow:0 6px 0 #B4AE9E; cursor:not-allowed; }
+  .lock-btn:disabled:active{ transform:none; box-shadow:0 6px 0 #B4AE9E; }
+  .submit-hint{ text-align:center; font-size:12.5px; font-weight:700; color:var(--endzone); margin:9px 0 0; }
   .lock-btn.override{ background:var(--endzone); color:#fff; box-shadow:0 6px 0 #7A1B29; }
   .lock-btn.override:active{ box-shadow:0 3px 0 #7A1B29; }
   .override-note{
@@ -355,6 +357,65 @@
     .quote-item{ word-break:break-word; }
     .lb-name, .wk-label .name{ word-break:break-word; }
   }
+  /* PRIZE BUILDER (Q5) */
+  .nopref-check{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-soft); margin-bottom:12px; cursor:pointer; }
+  .nopref-check input{ width:16px; height:16px; accent-color:var(--turf-mid); }
+  .prize-builder{
+    border:1.5px solid #E4DEC8; background:#FBF9F3; border-radius:12px; padding:13px;
+  }
+  .places-count{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .pc-label{ font-weight:800; font-size:14px; color:var(--ink); }
+  .stepper{ display:flex; align-items:center; gap:10px; }
+  .stepper .count{ font-weight:900; font-size:18px; min-width:20px; text-align:center; color:var(--turf-mid); font-family:"SF Mono",monospace; }
+  .step{
+    width:34px; height:34px; border-radius:9px; border:1.5px solid #D8D2C0; background:#fff;
+    font-size:20px; font-weight:800; line-height:1; color:var(--turf-mid); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; user-select:none;
+  }
+  .step:active{ transform:scale(0.94); }
+  .step:disabled{ opacity:0.35; cursor:not-allowed; }
+  .stepper.sm .step{ width:30px; height:30px; font-size:18px; }
+  .prize-rows{ display:flex; flex-direction:column; gap:8px; }
+  .prize-row{
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border:1px solid #E4DEC8; border-radius:9px; padding:8px 11px;
+  }
+  .prize-row.reg{ border-color:var(--gold); background:#FFFBEF; }
+  .prize-pos{ flex:1; font-weight:700; font-size:13.5px; color:var(--ink); line-height:1.15; }
+  .prize-pos small{ color:var(--ink-soft); font-weight:600; font-size:10.5px; }
+  .stepper.sm .prize-pct{ font-size:15px; min-width:42px; }
+  .prize-money{ min-width:64px; text-align:right; font-weight:800; font-size:13px; color:var(--gold); }
+  .reg-toggle{
+    width:100%; margin-top:10px; padding:11px 13px; border-radius:9px; cursor:pointer;
+    border:1.5px dashed #D8B24A; background:#FFFBEF; color:#8A6D12;
+    display:flex; align-items:center; justify-content:space-between; gap:12px; text-align:left;
+  }
+  .reg-toggle.on{ border-style:solid; border-color:var(--gold); background:#FFF6DA; color:var(--ink); }
+  .reg-toggle:active{ transform:scale(0.99); }
+  .reg-toggle-txt{ display:flex; flex-direction:column; }
+  .reg-toggle-title{ font-weight:800; font-size:13px; }
+  .reg-toggle-sub{ font-size:11px; font-weight:600; opacity:0.8; margin-top:2px; }
+  .reg-switch{
+    flex:0 0 auto; width:46px; height:27px; border-radius:20px; background:#CFC9BA;
+    position:relative; transition:background .15s ease;
+  }
+  .reg-toggle.on .reg-switch{ background:var(--gold); }
+  .reg-knob{
+    position:absolute; top:3px; left:3px; width:21px; height:21px; border-radius:50%;
+    background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.28); transition:left .15s ease;
+  }
+  .reg-toggle.on .reg-knob{ left:22px; }
+  .prize-total{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin-top:12px; padding:9px 12px; border-radius:9px; font-size:13px; font-weight:700;
+  }
+  .prize-total.ok{ background:#E4EFE4; color:var(--turf-mid); }
+  .prize-total.warn{ background:var(--endzone-dim); color:var(--endzone); }
+  .prize-reset{ background:none; border:none; text-decoration:underline; cursor:pointer; font-size:12px; font-weight:700; color:inherit; opacity:0.8; }
+  .res-sub{ font-size:11.5px; color:var(--ink-soft); margin:-6px 0 12px; }
+  .spread-detail{ font-size:11px; color:var(--ink-soft); margin-top:3px; font-family:"SF Mono",monospace; }
+  .bar-fill.gold{ background:var(--gold); }
+
   @media (hover:none){
     .drag-handle:hover{ background:transparent; color:#A79F87; }
     .pin-key:hover{ background:#FBF9F3; color:var(--ink); border-color:#DCD5C2; }
@@ -367,6 +428,53 @@
 <div id="app"></div>
 
 <script>
+/* ─────────────────────────────────────────────────────────────
+   BACKEND CONFIG
+   Paste your Google Apps Script Web App URL between the quotes.
+   (See README.md → "Backend setup" for the 5-minute walkthrough.)
+   Leave it as-is and the form still runs, but nothing will save.
+   ───────────────────────────────────────────────────────────── */
+const API_URL = 'https://script.google.com/macros/s/AKfycbzbz62iEh5NBOVqsqsoa1ZfNIK3sHKOvf9FBfVsizvD05M-vfLz_Pqep6pLhYanVVIF/exec';
+
+/* Fetch-based store that talks to the Apps Script backend.
+   Replaces Claude's built-in window.storage so the form works on
+   GitHub Pages (or any static host). Keyed by player name. */
+const RemoteStore = {
+  _ready(){ return API_URL && API_URL.indexOf('PASTE_YOUR') === -1; },
+  // Return { value: <jsonString> } for a single player, or null if none.
+  async get(key){
+    if(!this._ready()) throw new Error('API_URL not configured');
+    const res = await fetch(API_URL + '?action=get&key=' + encodeURIComponent(key), { method:'GET' });
+    if(!res.ok) throw new Error('get failed');
+    const data = await res.json();
+    return (data && data.value) ? { value: data.value } : null;
+  },
+  // Upsert one response (overwrites the row with the same key).
+  async set(key, valueString){
+    if(!this._ready()) throw new Error('API_URL not configured');
+    const res = await fetch(API_URL, {
+      method:'POST',
+      // text/plain avoids a CORS preflight; Apps Script parses the body.
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: JSON.stringify({ key: key, value: valueString })
+    });
+    if(!res.ok) throw new Error('set failed');
+    return true;
+  },
+  // Return an array of parsed response objects (all players).
+  async all(){
+    if(!this._ready()) throw new Error('API_URL not configured');
+    const res = await fetch(API_URL + '?action=list', { method:'GET' });
+    if(!res.ok) throw new Error('list failed');
+    const data = await res.json();
+    const out = [];
+    (data.responses || []).forEach(v => {
+      try{ out.push(typeof v === 'string' ? JSON.parse(v) : v); }catch(e){}
+    });
+    return out;
+  }
+};
+
 const ROSTER = [
   "Nikhil Nehra","Ryan Latin","Lyon Burns","Aidan Duncan","Stephen Comeaux",
   "Jaswin Jabbal","Dhruv Nandwani","Sean Vargeese","Shishir Nambi","Mattew Yoshida",
@@ -392,6 +500,29 @@ const WEEKENDS = [
 ];
 const BUYINS = ['$25','$50','$100'];
 
+/* Q5 (optional) — dynamic prize-pool builder. The respondent chooses how many
+   places get paid, tunes each cut in 5% steps, and can add a regular-season
+   points-leader cut. Everything shares one 100% pool. All values are multiples
+   of STEP so the meter can always land exactly on 100%. */
+const PRIZE_STEP = 5;
+const MAX_PLACES = 6;
+// Balanced starting split for each place count (each sums to 100, multiples of 5).
+const PLACE_TEMPLATES = {
+  1:[100], 2:[65,35], 3:[60,30,10], 4:[50,25,15,10],
+  5:[45,25,15,10,5], 6:[40,25,15,10,5,5]
+};
+const DEFAULT_PLACES = [50,25,10,5];   // 1st/2nd/3rd/4th (+ reg-season 10% = 100%)
+const DEFAULT_REG_SEASON = 10;         // regular-season leader cut is ON by default
+const REG_SEASON_DEFAULT = 10;         // amount carved out when toggling the cut on
+
+// Full pot if everyone pays the given buy-in (e.g. "$50" × 14 players).
+function potTotal(buyIn){
+  const n = parseInt(String(buyIn||'').replace(/[^0-9]/g,''),10);
+  return n ? n * ROSTER.length : 0;
+}
+function ordinal(n){ return n + (['th','st','nd','rd'][(n%100>10&&n%100<14)?0:(n%10<4?n%10:0)]); }
+function money(n){ return '$'+Number(n).toLocaleString(); }
+
 let state = {
   view: 'form',
   name: '',
@@ -403,6 +534,9 @@ let state = {
   expanded: {},
   inPerson: {},
   beefOrder: [],
+  prizeNoPref: false,
+  prizePlaces: DEFAULT_PLACES.slice(),
+  prizeRegSeason: DEFAULT_REG_SEASON,   // 0 = regular-season leader not paid
   submitting: false,
   error: '',
   resultsLoading: false,
@@ -559,10 +693,21 @@ function renderForm(){
         ${renderBeefRows()}
       </div>
 
+      <div class="section">
+        <div class="down-tag">OVERTIME · OPTIONAL</div>
+        <p class="q-text">How should the prize pool be split?</p>
+        <p class="q-help">Set how many places get paid and dial in each cut (5% steps) — you can also give the regular-season points leader a slice. ${state.buyIn
+          ? `Live dollars use your <strong>${state.buyIn}</strong> buy-in — a <strong>${money(potTotal(state.buyIn))}</strong> pot.`
+          : `Pick a buy-in up in the 1st down to see live dollar amounts.`}</p>
+        <label class="nopref-check"><input type="checkbox" ${state.prizeNoPref?'checked':''} onclick="setNoPref(this.checked)"> No preference — let the commissioner decide</label>
+        ${state.prizeNoPref ? '' : renderPrizeBuilder()}
+      </div>
+
       <div class="section submit-zone">
         ${state.error ? `<div class="error-msg">${state.error}</div>` : ''}
         ${state.overrideNotice ? `<div class="override-note">You already have a response saved under <strong>${state.name}</strong>. Locking in now will overwrite it — tap again to confirm.</div>` : ''}
-        <button class="lock-btn ${state.overrideNotice?'override':''}" ${state.submitting?'disabled':''} onclick="submitForm()">${state.submitting ? 'Locking it in…' : (state.overrideNotice ? 'Overwrite my previous answer' : 'Lock It In 🔒')}</button>
+        <button class="lock-btn ${state.overrideNotice?'override':''}" ${(state.submitting || !formValid())?'disabled':''} onclick="submitForm()">${state.submitting ? 'Locking it in…' : (state.overrideNotice ? 'Overwrite my previous answer' : 'Lock It In 🔒')}</button>
+        <p class="submit-hint" style="${(formValid()||state.submitting)?'display:none':''}">${formValid()?'':formIssue()+' to lock in'}</p>
       </div>
 
     </div>
@@ -581,7 +726,7 @@ function renderForm(){
       checkAlreadySubmitted();
     };
     const pun = document.getElementById('punishmentInput');
-    if(pun) pun.oninput = (e)=>{ state.punishment = e.target.value; };
+    if(pun) pun.oninput = (e)=>{ state.punishment = e.target.value; refreshSubmitState(); };
   },0);
   return wrap;
 }
@@ -654,6 +799,146 @@ function renderBeefRows(){
 
 function setBuyIn(b){ state.buyIn=b; render(); }
 function setLocality(l){ state.locality=l; render(); }
+
+/* ── Q5 dynamic prize builder ──────────────────────────────── */
+function prizeTotal(){ return state.prizePlaces.reduce((a,b)=>a+b,0) + state.prizeRegSeason; }
+function prizeRemaining(){ return 100 - prizeTotal(); }
+
+function setNoPref(on){ state.prizeNoPref = !!on; render(); }
+
+function resetPrize(){
+  state.prizePlaces = DEFAULT_PLACES.slice();
+  state.prizeRegSeason = DEFAULT_REG_SEASON;
+  render();
+}
+
+// Change how many places pay out. Loads that count's balanced template,
+// then re-carves room for a regular-season cut if one is active.
+function setPlaceCount(n){
+  n = Math.max(1, Math.min(MAX_PLACES, n));
+  const t = (PLACE_TEMPLATES[n] || PLACE_TEMPLATES[3]).slice();
+  state.prizePlaces = t;
+  if(state.prizeRegSeason > 0) makeRoom(state.prizeRegSeason);
+  render();
+}
+
+// Free `amount`% from the places (biggest first, never below one step) so the
+// pool can fund the regular-season cut while staying at 100%.
+function makeRoom(amount){
+  let need = amount;
+  while(need > 0){
+    let bi = -1, bv = PRIZE_STEP;
+    state.prizePlaces.forEach((v,i)=>{ if(v > bv){ bv = v; bi = i; } });
+    if(bi === -1) break;               // nothing left to take
+    state.prizePlaces[bi] -= PRIZE_STEP;
+    need -= PRIZE_STEP;
+  }
+}
+
+// +/- one place's cut. Never lets the pool exceed 100% or a place drop below 5%.
+function bumpPlace(i, delta){
+  if(delta > 0) delta = Math.min(delta, prizeRemaining());
+  const next = state.prizePlaces[i] + delta;
+  if(next < PRIZE_STEP) return;         // remove places via the count stepper
+  state.prizePlaces[i] = next;
+  render();
+}
+
+// Turn the regular-season leader cut on/off. Reg-season gets exactly the % we
+// free from the places, so the pool always stays at 100%.
+function toggleRegSeason(){
+  if(state.prizeRegSeason > 0){
+    state.prizePlaces[0] += state.prizeRegSeason; // hand the % back to 1st place
+    state.prizeRegSeason = 0;
+  } else {
+    const before = state.prizePlaces.reduce((a,b)=>a+b,0);
+    makeRoom(REG_SEASON_DEFAULT);
+    state.prizeRegSeason = before - state.prizePlaces.reduce((a,b)=>a+b,0);
+  }
+  render();
+}
+
+function bumpRegSeason(delta){
+  if(delta > 0) delta = Math.min(delta, prizeRemaining());
+  const next = state.prizeRegSeason + delta;
+  if(next < PRIZE_STEP) return;         // turn it off via the toggle
+  state.prizeRegSeason = next;
+  render();
+}
+
+// Live dollar figures for the current plan (each = that %'s share of the pot).
+function prizeDollars(){
+  const pot = potTotal(state.buyIn);
+  if(!pot) return null;
+  return {
+    places: state.prizePlaces.map(p => Math.round(pot * p / 100)),
+    reg: state.prizeRegSeason > 0 ? Math.round(pot * state.prizeRegSeason / 100) : 0
+  };
+}
+
+function renderPrizeBuilder(){
+  const pot = potTotal(state.buyIn);
+  const dols = prizeDollars();
+  const rem = prizeRemaining();
+  const n = state.prizePlaces.length;
+
+  const placeRows = state.prizePlaces.map((pct,i)=>`
+    <div class="prize-row">
+      <span class="prize-pos">${ordinal(i+1)}</span>
+      <div class="stepper sm">
+        <button type="button" class="step" onclick="bumpPlace(${i},-${PRIZE_STEP})" ${pct<=PRIZE_STEP?'disabled':''}>−</button>
+        <span class="prize-pct">${pct}%</span>
+        <button type="button" class="step" onclick="bumpPlace(${i},${PRIZE_STEP})" ${rem<=0?'disabled':''}>+</button>
+      </div>
+      ${dols ? `<span class="prize-money">${money(dols.places[i])}</span>` : ''}
+    </div>`).join('');
+
+  const regRow = state.prizeRegSeason > 0 ? `
+    <div class="prize-row reg">
+      <span class="prize-pos">🏆 Reg. season<br><small>points leader</small></span>
+      <div class="stepper sm">
+        <button type="button" class="step" onclick="bumpRegSeason(-${PRIZE_STEP})" ${state.prizeRegSeason<=PRIZE_STEP?'disabled':''}>−</button>
+        <span class="prize-pct">${state.prizeRegSeason}%</span>
+        <button type="button" class="step" onclick="bumpRegSeason(${PRIZE_STEP})" ${rem<=0?'disabled':''}>+</button>
+      </div>
+      ${dols ? `<span class="prize-money">${money(dols.reg)}</span>` : ''}
+    </div>` : '';
+
+  const meterClass = rem === 0 ? 'ok' : 'warn';
+  const meterText = rem === 0
+    ? 'Allocated: 100% ✓'
+    : (rem > 0 ? `${100-rem}% allocated · <strong>${rem}% left to assign</strong>` : `<strong>${-rem}% over</strong> — trim a cut`);
+
+  return `
+    <div class="prize-builder">
+      <div class="places-count">
+        <span class="pc-label">Places paid out</span>
+        <div class="stepper">
+          <button type="button" class="step" onclick="setPlaceCount(${n-1})" ${n<=1?'disabled':''}>−</button>
+          <span class="count">${n}</span>
+          <button type="button" class="step" onclick="setPlaceCount(${n+1})" ${n>=MAX_PLACES?'disabled':''}>+</button>
+        </div>
+      </div>
+
+      <div class="prize-rows">
+        ${placeRows}
+        ${regRow}
+      </div>
+
+      <button type="button" class="reg-toggle ${state.prizeRegSeason>0?'on':''}" onclick="toggleRegSeason()" role="switch" aria-checked="${state.prizeRegSeason>0}">
+        <span class="reg-toggle-txt">
+          <span class="reg-toggle-title">🏆 Pay the regular-season points leader</span>
+          <span class="reg-toggle-sub">${state.prizeRegSeason>0 ? `On — carves ${state.prizeRegSeason}% out of the pot. Tap to turn off.` : 'Off — tap to give the #1 seed a cut.'}</span>
+        </span>
+        <span class="reg-switch" aria-hidden="true"><span class="reg-knob"></span></span>
+      </button>
+
+      <div class="prize-total ${meterClass}">
+        <span>${meterText}</span>
+        <button type="button" class="prize-reset" onclick="resetPrize()">Reset</button>
+      </div>
+    </div>`;
+}
 function setInPerson(id, val){ state.inPerson[id]=val; render(); }
 function toggleExpand(id){ state.expanded[id] = !state.expanded[id]; render(); }
 function toggleDay(dayId){
@@ -789,7 +1074,7 @@ async function checkAlreadySubmitted(){
   if(!state.name){ state.alreadySubmitted = null; return; }
   const who = state.name;
   try{
-    const r = await window.storage.get('response:' + who, true);
+    const r = await RemoteStore.get('response:' + who);
     if(state.name !== who) return; // name changed while awaiting
     state.alreadySubmitted = !!(r && r.value);
   }catch(e){
@@ -798,8 +1083,35 @@ async function checkAlreadySubmitted(){
   render();
 }
 
+// The first thing still missing/invalid, or '' if the form is ready to submit.
+function formIssue(){
+  if(!state.name) return 'Pick your name';
+  if(!state.buyIn) return 'Vote on a buy-in';
+  if(!state.punishment || !state.punishment.trim()) return 'Add a punishment idea';
+  if(!state.locality) return "Tell us where you're coming from";
+  const totalDays = WEEKENDS.reduce((a,w)=>a+w.days.length,0);
+  if(Object.keys(state.cantMake).length >= totalDays) return 'Leave at least one draft date open';
+  if(!state.prizeNoPref && prizeTotal() !== 100) return `Prize split must total 100% (it's at ${prizeTotal()}%)`;
+  return '';
+}
+function formValid(){ return formIssue() === ''; }
+
+// Keep the submit button/hint in sync without a full re-render (so typing in the
+// punishment box doesn't lose focus).
+function refreshSubmitState(){
+  const btn = document.querySelector('.lock-btn');
+  if(btn) btn.disabled = state.submitting || !formValid();
+  const hint = document.querySelector('.submit-hint');
+  if(hint){
+    const show = !formValid() && !state.submitting;
+    hint.textContent = show ? formIssue() + ' to lock in' : '';
+    hint.style.display = show ? '' : 'none';
+  }
+}
+
 async function submitForm(){
   state.error = '';
+  if(!formValid()) return;              // button is disabled anyway; belt-and-suspenders
   if(!state.name){ state.error = 'Pick your name first.'; render(); return; }
   if(!state.buyIn){ state.error = 'Vote on a buy-in amount.'; render(); return; }
   if(!state.punishment || !state.punishment.trim()){ state.error = 'Give us at least one punishment idea.'; render(); return; }
@@ -807,13 +1119,17 @@ async function submitForm(){
   const totalDays = WEEKENDS.reduce((a,w)=>a+w.days.length,0);
   const cantCount = Object.keys(state.cantMake).length;
   if(cantCount >= totalDays){ state.error = 'You marked every single date as unavailable — leave at least one open.'; render(); return; }
+  if(!state.prizeNoPref && prizeTotal() !== 100){
+    state.error = `Your prize split adds up to ${prizeTotal()}% — make it 100% (or hit Reset / pick "no preference").`;
+    render(); return;
+  }
 
   // One entry per person: if a response already exists, make them confirm the overwrite.
   if(!state.overrideConfirm){
     state.submitting = true; render();
     let exists = false;
     try{
-      const r = await window.storage.get('response:' + state.name, true);
+      const r = await RemoteStore.get('response:' + state.name);
       exists = !!(r && r.value);
     }catch(e){ exists = false; }
     state.submitting = false;
@@ -838,11 +1154,12 @@ async function submitForm(){
     cantMake: state.cantMake,
     inPerson: state.inPerson,
     beefOrder: state.beefOrder,
+    prizePlan: state.prizeNoPref ? null : { places: state.prizePlaces.slice(), regSeason: state.prizeRegSeason },
     submittedAt: new Date().toISOString()
   };
 
   try{
-    await window.storage.set('response:' + state.name, JSON.stringify(payload), true);
+    await RemoteStore.set('response:' + state.name, JSON.stringify(payload));
     state.submitting = false;
     state.view = 'success';
     render();
@@ -871,16 +1188,7 @@ async function loadResults(){
   state.resultsLoading = true;
   const container = document.querySelector('.res-card.loading-target');
   try{
-    const list = await window.storage.list('response:', true);
-    const keys = (list && list.keys) ? list.keys : [];
-    const responses = [];
-    for(const k of keys){
-      try{
-        const r = await window.storage.get(k, true);
-        if(r && r.value) responses.push(JSON.parse(r.value));
-      }catch(e){ /* skip bad key */ }
-    }
-    state.results = responses;
+    state.results = await RemoteStore.all();
   }catch(e){
     state.results = [];
   }
@@ -906,6 +1214,25 @@ function renderResults(){
   const buyCounts = {}; BUYINS.forEach(b=>buyCounts[b]=0);
   responses.forEach(r=>{ if(buyCounts[r.buyIn]!==undefined) buyCounts[r.buyIn]++; });
   const maxBuy = Math.max(1, ...Object.values(buyCounts));
+  // Leading buy-in drives the dollar figures shown next to each prize spread.
+  let leadingBuy=''; let bestBuy=-1;
+  BUYINS.forEach(b=>{ if(buyCounts[b]>bestBuy){ bestBuy=buyCounts[b]; leadingBuy=b; } });
+  const resPot = bestBuy>0 ? potTotal(leadingBuy) : 0;
+
+  // Prize plan aggregation. Each response's plan = { places:[...], regSeason:N }
+  // or null ("no preference"). We average the proposed distribution across
+  // everyone who expressed a preference (unfunded places count as 0%).
+  const plans = responses.map(r=>r.prizePlan).filter(p=>p && Array.isArray(p.places));
+  const noPrefCount = responses.filter(r=>('prizePlan' in r) && r.prizePlan===null).length;
+  const maxPlaces = plans.reduce((m,p)=>Math.max(m,p.places.length),0);
+  const placeAvgPct = [];
+  for(let i=0;i<maxPlaces;i++){
+    const sum = plans.reduce((a,p)=>a+(p.places[i]||0),0);
+    placeAvgPct.push(plans.length ? sum/plans.length : 0);
+  }
+  const regAdopters = plans.filter(p=>(p.regSeason||0)>0);
+  const regAvgAll = plans.length ? plans.reduce((a,p)=>a+(p.regSeason||0),0)/plans.length : 0;
+  const avgPlaceCount = plans.length ? plans.reduce((a,p)=>a+p.places.filter(x=>x>0).length,0)/plans.length : 0;
 
   // Weekend stats (with per-day unavailability)
   const wkStats = WEEKENDS.map(wk=>{
@@ -962,6 +1289,24 @@ function renderResults(){
           <div class="bar-track"><div class="bar-fill" style="width:${(buyCounts[b]/maxBuy)*100}%"></div></div>
         </div>
       `).join('')}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">PRIZE POOL SPREAD — CROWDSOURCED AVERAGE</p>
+      ${plans.length===0
+        ? `<p class="empty-note">No prize-split preferences yet.${noPrefCount?` (${noPrefCount} said "no preference.")`:''}</p>`
+        : `
+        <p class="res-sub">Average of ${plans.length} preference${plans.length>1?'s':''}${noPrefCount?` · ${noPrefCount} said "no preference"`:''} · typically <strong>${avgPlaceCount.toFixed(1)}</strong> places paid${resPot?` · dollars based on the leading ${leadingBuy} buy-in (${money(resPot)} pot)`:''}</p>
+        ${placeAvgPct.map((pct,i)=>`
+          <div class="bar-row">
+            <div class="bar-label"><span>${ordinal(i+1)} place</span><span>${pct.toFixed(0)}%${resPot?` · ${money(Math.round(resPot*pct/100))}`:''}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+          </div>`).join('')}
+        <div class="bar-row">
+          <div class="bar-label"><span>🏆 Reg. season points leader</span><span>${regAvgAll.toFixed(0)}%${resPot?` · ${money(Math.round(resPot*regAvgAll/100))}`:''}</span></div>
+          <div class="bar-track"><div class="bar-fill gold" style="width:${regAvgAll}%"></div></div>
+          <div class="spread-detail">wanted by ${regAdopters.length} of ${plans.length}</div>
+        </div>`}
     </div>
 
     <div class="res-card">
