@@ -3,7 +3,17 @@
  * ------------------------------------------------------------------
  * Stores one row per player in a Google Sheet and serves the
  * commissioner's results view. Paste this into a Google Sheet's
- * Apps Script editor and deploy it as a Web App (see SETUP.md).
+ * Apps Script editor and deploy it as a Web App.
+ *   Full setup walkthrough: README.md → "Backend setup".
+ *
+ * HOW IT ALL CONNECTS (you don't configure a sheet name/ID anywhere):
+ *   1. The FORM finds this SCRIPT via the deployed Web App URL, which you
+ *      paste into index.html as `const API_URL = '.../exec'`. That URL is
+ *      the only wiring between the two.
+ *   2. This SCRIPT finds your SPREADSHEET automatically because it is
+ *      "container-bound" — it was created from Extensions -> Apps Script
+ *      INSIDE your Sheet, so getActiveSpreadsheet() always returns that
+ *      exact Sheet. Nothing to paste, no ID to copy.
  *
  * Sheet columns (row 1 headers, created automatically): key | value | updatedAt
  *   key       = "response:<Player Name>"  (one row per player, overwrites on resubmit)
@@ -11,6 +21,10 @@
  *   updatedAt = ISO timestamp of the last write
  */
 
+// The TAB (worksheet) name inside your spreadsheet where rows are written —
+// NOT the spreadsheet's file name. You do NOT need to change this: if a tab
+// called "responses" doesn't exist yet, _sheet() creates it automatically.
+// Only rename this if you want the data written to a differently-named tab.
 var SHEET_NAME = 'responses';
 
 function _sheet() {
