@@ -127,8 +127,11 @@ Nikhil Nehra, Ryan Latin, Lyon Burns, Aidan Duncan, Stephen Comeaux, Jaswin Jabb
 
 1. Open the link → tap **Commissioner's Desk** (top-right).
 2. Enter **7531** on the keypad.
-3. You'll see a live tally: response count + who's still missing, the buy-in vote, the crowdsourced prize-split average (avg % and dollars per place, plus how many want a reg-season cut), all punishment ideas, weekends ranked with a per-day availability breakdown, and the rivalry leaderboard.
-4. Reopen and re-enter the PIN anytime to refresh as more people submit.
+3. You'll see a live tally: response count + who's still missing, the buy-in vote, the crowdsourced prize-split average (avg % and dollars per place, plus how many want a reg-season cut), all punishment ideas, weekends ranked with a per-day availability breakdown, and **Rivalry Matchups** — auto-generated rival pairings.
+4. At the bottom, an **Individual Responses** section lists every respondent — tap a name to expand their full submission (buy-in, where they're coming from, punishment, prize split, ranked draft availability with days out and in-person/virtual, and their rivalry ranking).
+5. Reopen and re-enter the PIN anytime to refresh as more people submit.
+
+**How Rivalry Matchups works:** for every possible pair of people who've submitted, it adds up how highly each ranked the other on their rivalry list (a mutual-beef score). It then locks in the strongest mutual pair first, then the next strongest among who's left, and so on — so each person ends up in at most one rivalry. Anyone left over (an odd number of responses, or too few submissions) shows under **No current pair**, which fills in automatically as more people submit. Each pairing shows a strength label and both players' ranking of each other.
 
 ---
 
