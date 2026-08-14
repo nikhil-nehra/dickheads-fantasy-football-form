@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Dickhead's League — Hub</title>
+<link rel="stylesheet" href="league.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="league.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   THE LEAGUE HUB
+   ═══════════════════════════════════════════════════════════════════════
+   One page listing every survey with its live status, plus the permanent
+   boards. Everything here is driven off SURVEYS and BOARDS in league.js —
+   add a survey there and a card appears here automatically.
+
+   Surveys in 'draft' or 'archived' are hidden from the main list. Archived
+   ones drop into a collapsed Archive section so nothing is ever lost; a
+   'draft' one is only visible from the Commissioner's Desk.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+let state = {
+  loading: true,
+  loadError: false,
+  counts: {},          // surveyId -> how many people have responded
+  showArchive: false
+};
+
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  app.appendChild(renderBanner({
+    tag: 'THE DICKHEAD\'S LEAGUE · 2026',
+    titleHtml: "The Dickhead's<br>League Hub",
+    subtitle: 'Every survey, every board, one place. Fill in whatever is open.',
+    nav: standardNav('hub')
+  }));
+  app.appendChild(renderMain());
+}
+
+function renderMain(){
+  const wrap = document.createElement('main');
+
+  if(state.loading){
+    wrap.innerHTML = '<div class="card"><p class="empty-note">Checking what\'s open…</p></div>';
+    return wrap;
+  }
+
+  const live = [], archived = [];
+  SURVEYS.forEach(s => {
+    const st = LeagueStatus.of(s.id);
+    if(st === 'archived') archived.push(s);
+    else if(st === 'draft') { /* commissioner-only: not shown to the league */ }
+    else live.push(s);
+  });
+
+  wrap.innerHTML = `
+    <div class="card">
+      <div class="hub-intro">
+        <h2>League business</h2>
+        <p>${state.loadError
+            ? 'Couldn\'t reach the league database, so statuses below may be stale.'
+            : 'Anything marked <strong>open</strong> still needs you. Closed surveys stay readable — the results live on the boards.'}</p>
+      </div>
+    </div>
+
+    ${live.length ? `
+      <div class="hub-sec">SURVEYS</div>
+      ${live.map(renderSurveyCard).join('')}
+    ` : `<div class="card"><p class="empty-note">Nothing open right now. Check the boards below.</p></div>`}
+
+    <div class="hub-sec">PERMANENT BOARDS</div>
+    ${BOARDS.map(renderBoardCard).join('')}
+
+    ${archived.length ? `
+      <div class="hub-sec">ARCHIVE</div>
+      <button class="archive-toggle" onclick="toggleArchive()">
+        ${state.showArchive ? '▲ HIDE' : '▼ SHOW'} ${archived.length} ARCHIVED SURVEY${archived.length===1?'':'S'}
+      </button>
+      ${state.showArchive ? archived.map(renderSurveyCard).join('') : ''}
+    ` : ''}
+  `;
+  return wrap;
+}
+
+function renderSurveyCard(s){
+  const st = LeagueStatus.of(s.id);
+  const meta = STATUS_META[st] || STATUS_META.open;
+  const n = state.counts[s.id] || 0;
+  const pct = Math.round(n / ROSTER.length * 100);
+  const changed = LeagueStatus.changedAt(s.id);
+
+  return `
+    <a class="hub-card is-${st}" href="${esc(s.file)}">
+      <div class="hub-top">
+        <span class="hub-title">${esc(s.title)}</span>
+        <span class="st-badge ${st}">${esc(meta.label)}</span>
+      </div>
+      <p class="hub-blurb">${esc(s.blurb)}</p>
+      <div class="hub-foot">
+        <span>${n} / ${ROSTER.length} in</span>
+        <span class="hub-prog"><span style="width:${pct}%"></span></span>
+        <span class="hub-cta">${st === 'open' ? 'Fill it in →' : 'See your answers →'}</span>
+      </div>
+      ${st !== 'open' && changed ? `<div class="hub-foot" style="border:none;padding-top:2px;margin-top:0"><span>${esc(meta.label)} ${esc(fmtDate(changed))}</span></div>` : ''}
+    </a>`;
+}
+
+function renderBoardCard(b){
+  const from = surveyById(b.from);
+  return `
+    <a class="hub-card is-board" href="boards.html#${esc(b.id)}">
+      <div class="hub-top">
+        <span class="hub-title">${esc(b.title)}</span>
+        <span class="st-badge board">Always on</span>
+      </div>
+      <p class="hub-blurb">${esc(b.blurb)}</p>
+      <div class="hub-foot">
+        <span>from ${esc(from ? from.short : b.from)}</span>
+        <span class="hub-cta">Open the board →</span>
+      </div>
+    </a>`;
+}
+
+function toggleArchive(){ state.showArchive = !state.showArchive; render(); }
+
+(async function boot(){
+  render();
+  try{
+    // One call: every row plus the status map. The hub never polls, so
+    // pulling everything once is cheaper than several filtered requests.
+    const d = await LeagueStore.list();
+    LeagueStatus.hydrate(d.status);
+    state.counts.intake  = d.intake.length;
+    state.counts.rivalry = Object.keys(d.rivalry).length;
+  }catch(e){
+    state.loadError = true;
+  }
+  state.loading = false;
+  render();
+})();
+</script>
+</body>
+</html>

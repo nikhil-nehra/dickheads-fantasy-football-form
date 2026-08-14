@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Boards — The Dickhead's League</title>
+<link rel="stylesheet" href="league.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="league.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   THE PERMANENT BOARDS
+   ═══════════════════════════════════════════════════════════════════════
+   Public, read-only, no PIN. These deliberately DO NOT check survey status:
+   a board keeps working forever after its survey closes or is archived.
+   That's the whole point — surveys close, boards are forever.
+
+   Every tab is deep-linkable:  boards.html#rivalry  #draft  #pot
+   The Rivalry Board link is the one to paste into Sleeper league chat once —
+   Sleeper's API is read-only, so a live link is the closest thing to native.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+let state = {
+  loading: true,
+  loadError: false,
+  tab: (location.hash || '').replace('#','') || BOARDS[0].id,
+  intake: [],
+  s2: {},
+  force: {}
+};
+if(!boardById(state.tab)) state.tab = BOARDS[0].id;
+
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  const b = boardById(state.tab);
+  app.appendChild(renderBanner({
+    tag: 'THE BOARDS · 2026',
+    titleHtml: 'The Boards',
+    subtitle: 'The permanent record. Updates itself as things get agreed.',
+    nav: standardNav('boards')
+  }));
+  app.appendChild(renderMain(b));
+}
+
+function renderMain(b){
+  const wrap = document.createElement('main');
+  const tabs = BOARDS.map(x =>
+    `<button class="tab ${x.id===state.tab?'active':''}" onclick="setTab('${jsStr(x.id)}')">${esc(x.title)}</button>`
+  ).join('');
+
+  if(state.loading){
+    wrap.innerHTML = `<div class="tabbar">${tabs}</div><div class="res-card"><p class="empty-note">Loading the boards…</p></div>`;
+    return wrap;
+  }
+  if(state.loadError){
+    wrap.innerHTML = `<div class="tabbar">${tabs}</div>
+      <div class="res-card"><p class="empty-note">Couldn't reach the league database.<br>
+      <button class="copy-btn" style="margin-top:12px" onclick="boot()">↻ Try again</button></p></div>`;
+    return wrap;
+  }
+
+  let body = '';
+  if(state.tab === 'rivalry') body = renderRivalryBoard();
+  else if(state.tab === 'draft') body = renderDraftBoard();
+  else if(state.tab === 'pot') body = renderPotBoard();
+
+  wrap.innerHTML = `
+    <div class="tabbar">${tabs}</div>
+    <div class="res-card">
+      <div class="board-hero">
+        <h2>${esc(b.title)}</h2>
+        <p>${esc(b.blurb)}</p>
+        <div class="copy-row">
+          <button class="copy-btn" onclick="copyBoardLink()">🔗 Copy link for Sleeper</button>
+          <button class="copy-btn" onclick="boot()">↻ Refresh</button>
+        </div>
+      </div>
+    </div>
+    ${body}
+    <span class="back-link" onclick="location.href='${jsStr(hubHref())}'">← Back to the league hub</span>
+  `;
+  return wrap;
+}
+
+function setTab(id){
+  state.tab = id;
+  history.replaceState(null, '', location.pathname + location.search + '#' + id);
+  render(); window.scrollTo(0,0);
+}
+window.addEventListener('hashchange', function(){
+  const t = (location.hash||'').replace('#','');
+  if(boardById(t) && t !== state.tab){ state.tab = t; render(); }
+});
+function copyBoardLink(){
+  copyText(location.origin + location.pathname + '#' + state.tab,
+           'Link copied — paste it in Sleeper league chat');
+}
+
+
+/* ═════════════ 1. THE RIVALRY BOARD ═════════════ */
+function renderRivalryBoard(){
+  const pairs = activePairs(state.intake);
+  const total = pairs.length * NEG_FIELDS.length;
+  const done  = pairs.reduce((a,p)=> a + pairSettledCount(p[0],p[1],state.s2,state.force), 0);
+
+  if(!pairs.length){
+    return `<div class="res-card"><p class="empty-note">No rivalries set up yet.<br>The commissioner needs to fill in <code>RIVAL_PAIRS</code> in league.js.</p></div>`;
+  }
+
+  return `
+    <div class="res-card">
+      <div class="kv-grid">
+        <div class="kv"><div class="kv-v">${pairs.length}</div><div class="kv-k">rivalries</div></div>
+        <div class="kv"><div class="kv-v">${done}</div><div class="kv-k">lines agreed</div></div>
+        <div class="kv"><div class="kv-v gold">${total - done}</div><div class="kv-k">still arguing</div></div>
+      </div>
+    </div>
+    ${pairs.map(p => renderBoardPair(p[0], p[1])).join('')}`;
+}
+
+function renderBoardPair(a, b){
+  const nameSt = fieldStatus(a, b, 'rname', state.s2, state.force);
+  const title  = (nameSt.state==='agreed'||nameSt.state==='forced') ? nameSt.value : null;
+  const settled = pairSettledCount(a,b,state.s2,state.force);
+
+  return `
+    <div class="board-pair ${settled===NEG_FIELDS.length?'done':''}">
+      <div class="bp-head">
+        <div class="bp-title ${title?'':'unnamed'}">${title ? esc(title) : 'Rivalry name not agreed yet'}</div>
+        <div class="bp-vs">${esc(a)} &nbsp;vs&nbsp; ${esc(b)}</div>
+      </div>
+      <div class="bp-body">
+        ${NEG_FIELDS.filter(f=>f.key!=='rname').map(f=>{
+          const st = fieldStatus(a,b,f.key,state.s2,state.force);
+          const ok = st.state==='agreed' || st.state==='forced';
+          const badge = st.state==='forced' ? '<span class="mini-badge forced">RULED</span>'
+                      : st.state==='agreed' ? '<span class="mini-badge ok">AGREED</span>'
+                      : st.state==='waiting' ? '<span class="mini-badge pend">IN DISPUTE</span>'
+                      : '<span class="mini-badge pend">NOT SET</span>';
+          return `
+            <div class="bp-line">
+              <div class="bp-k">${esc(f.tag)} ${badge}</div>
+              <div class="bp-v ${ok?'':'pending'}">${ok ? esc(st.value)
+                : (st.state==='waiting' ? 'Still arguing about it.' : 'Nothing proposed yet.')}</div>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+
+/* ═════════════ 2. DRAFT DAY ═════════════ */
+function renderDraftBoard(){
+  const rs = state.intake;
+  if(!rs.length) return `<div class="res-card"><p class="empty-note">Nobody has filled in the intake survey yet.</p></div>`;
+
+  const ws = weekendStats(rs);
+  const best = ws.best;
+  const bestDay = bestDraftDay(rs);
+  const missing = ROSTER.filter(n => !rs.some(r => r.name === n));
+  const oot = rs.filter(r => r.locality === 'oot');
+
+  return `
+    <div class="res-card">
+      <div class="kv-grid">
+        <div class="kv"><div class="kv-v">${rs.length}<span style="font-size:13px;opacity:.5">/${ROSTER.length}</span></div><div class="kv-k">responded</div></div>
+        <div class="kv"><div class="kv-v gold sm">${best ? esc(best.wk.label) : '—'}</div><div class="kv-k">leading weekend</div></div>
+        <div class="kv"><div class="kv-v">${oot.length}</div><div class="kv-k">out of town</div></div>
+      </div>
+      ${bestDay ? `<div class="board-note"><strong>Best single date:</strong> ${esc(bestDay.day.short)} —
+        ${bestDay.out === 0 ? 'nobody has flagged it' : bestDay.out + ' ' + (bestDay.out===1?'person':'people') + ' can\'t make it'}.</div>` : ''}
+      ${missing.length ? `<div class="board-note">Still no answer from: ${missing.map(esc).join(', ')}.</div>` : ''}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">WEEKENDS — RANKED BY PREFERENCE</p>
+      ${ws.ranked.map(s=>`
+        <div class="wk-result-block">
+          <div class="wk-result">
+            <div class="l">${esc(s.wk.label)}${best && s.avg===best.avg?'<span class="frontrunner">FRONTRUNNER</span>':''}</div>
+            <div class="r">avg rank ${s.avg.toFixed(1)} · ${s.available} in${s.fullyOut?` · ${s.fullyOut} out`:''}${(s.inPersonCount+s.virtualCount)>0?` · ${s.inPersonCount} in-person / ${s.virtualCount} virtual`:''}</div>
+          </div>
+          <div class="day-breakdown">
+            ${s.wk.days.map(d=>`<span class="day-stat ${s.dayOut[d.id]?'has-out':''}">${esc(d.short)} · ${s.dayOut[d.id] ? s.dayOut[d.id]+' out' : 'clear'}</span>`).join('')}
+          </div>
+        </div>`).join('')}
+      ${ws.stats.filter(s=>s.avg===null).map(s=>`
+        <div class="wk-result-block">
+          <div class="wk-result"><div class="l">${esc(s.wk.label)}</div><div class="r">everyone's out this weekend</div></div>
+        </div>`).join('')}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">WHO'S COMING</p>
+      <p class="res-sub">Based on the leading weekend${best ? ' (' + esc(best.wk.label) + ')' : ''}.</p>
+      ${['local','oot'].map(loc=>{
+        const group = rs.filter(r=>r.locality===loc);
+        if(!group.length) return '';
+        return `<div style="margin-bottom:12px">
+          <div class="bp-k" style="margin-bottom:6px">${loc==='local'?'📍 IN TOWN (DALLAS)':'✈️ OUT OF TOWN'} · ${group.length}</div>
+          <div class="pill-row">
+            ${group.map(r=>{
+              if(!best) return `<span class="pill">${esc(r.name)}</span>`;
+              const cm = r.cantMake || {};
+              const allOut = best.wk.days.every(d=>cm[d.id]);
+              if(allOut) return `<span class="pill bad">${esc(r.name)} · out</span>`;
+              if(loc==='oot'){
+                const virt = r.inPerson && r.inPerson[best.wk.id] === false;
+                return `<span class="pill ${virt?'gold':'good'}">${esc(r.name)} · ${virt?'virtual':'in person'}</span>`;
+              }
+              return `<span class="pill good">${esc(r.name)}</span>`;
+            }).join('')}
+          </div></div>`;
+      }).join('')}
+    </div>`;
+}
+
+
+/* ═════════════ 3. THE POT ═════════════ */
+function renderPotBoard(){
+  const rs = state.intake;
+  if(!rs.length) return `<div class="res-card"><p class="empty-note">Nobody has filled in the intake survey yet.</p></div>`;
+
+  const buy = buyInTally(rs);
+  const agg = prizeAggregate(rs);
+  const pot = buy.pot;
+
+  return `
+    <div class="res-card">
+      <div class="kv-grid">
+        <div class="kv"><div class="kv-v gold sm">${esc(buy.leading || '—')}</div><div class="kv-k">leading buy-in</div></div>
+        <div class="kv"><div class="kv-v sm">${pot ? esc(money(pot)) : '—'}</div><div class="kv-k">total pot</div></div>
+        <div class="kv"><div class="kv-v">${agg.avgPlaceCount ? agg.avgPlaceCount.toFixed(1) : '—'}</div><div class="kv-k">places paid</div></div>
+      </div>
+      <div class="board-note">Pot assumes all ${ROSTER.length} players at the leading buy-in. Percentages are the average of everyone who expressed a preference${agg.noPrefCount ? ` — ${agg.noPrefCount} said "commissioner decides"` : ''}.</div>
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">BUY-IN VOTE</p>
+      ${BUYINS.map(b=>`
+        <div class="bar-row">
+          <div class="bar-label"><span class="bl-l">${esc(b)}${b===buy.leading&&buy.leadingCount>0?'<span class="frontrunner">LEADER</span>':''}</span><span class="bl-r">${buy.counts[b]} vote${buy.counts[b]===1?'':'s'}</span></div>
+          <div class="bar-track"><div class="bar-fill ${b===buy.leading&&buy.leadingCount>0?'gold':''}" style="width:${(buy.counts[b]/buy.max)*100}%"></div></div>
+        </div>`).join('')}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">THE SPLIT — CROWDSOURCED AVERAGE</p>
+      ${agg.plans.length === 0
+        ? `<p class="empty-note">No prize-split preferences yet.${agg.noPrefCount?` (${agg.noPrefCount} said "no preference".)`:''}</p>`
+        : `
+        <p class="res-sub">Average of ${agg.plans.length} preference${agg.plans.length>1?'s':''}${agg.noPrefCount?` · ${agg.noPrefCount} said "no preference"`:''}.</p>
+        ${agg.placeAvgPct.map((pct,i)=>`
+          <div class="bar-row">
+            <div class="bar-label"><span class="bl-l">${ordinal(i+1)} place</span><span class="bl-r">${pct.toFixed(0)}%${pot?` · ${esc(money(Math.round(pot*pct/100)))}`:''}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+          </div>`).join('')}
+        <div class="bar-row">
+          <div class="bar-label"><span class="bl-l">🏆 Reg. season points leader</span><span class="bl-r">${agg.regAvgAll.toFixed(0)}%${pot?` · ${esc(money(Math.round(pot*agg.regAvgAll/100)))}`:''}</span></div>
+          <div class="bar-track"><div class="bar-fill gold" style="width:${agg.regAvgAll}%"></div></div>
+          <div class="spread-detail">wanted by ${agg.regAdopters.length} of ${agg.plans.length}</div>
+        </div>`}
+    </div>`;
+}
+
+
+/* ═════════════ BOOT ═════════════ */
+async function boot(){
+  state.loading = true; render();
+  try{
+    const d = await LeagueStore.list();     // boards need every survey's rows
+    state.intake = d.intake;
+    state.s2 = d.rivalry;
+    state.force = d.force;
+    LeagueStatus.hydrate(d.status);
+    state.loadError = false;
+  }catch(e){ state.loadError = true; }
+  state.loading = false;
+  render();
+}
+boot();
+</script>
+</body>
+</html>

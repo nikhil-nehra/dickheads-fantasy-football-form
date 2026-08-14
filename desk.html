@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commissioner's Desk — The Dickhead's League</title>
+<link rel="stylesheet" href="league.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="league.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   THE COMMISSIONER'S DESK
+   ═══════════════════════════════════════════════════════════════════════
+   One PIN, one page. Tabs: League Control, then every survey's results.
+
+   League Control is where surveys are opened, closed, archived and
+   REACTIVATED. Status lives in the sheet under `meta:status`, not in code,
+   so this works from a phone with no git. The PIN is sent with the write and
+   verified server-side in Code.gs — a closed survey genuinely can't be
+   written to, and only this page can change a status.
+
+   Nothing here ever deletes a response. Closing gates writes; that's all.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+let state = {
+  authed: false,
+  loading: false,
+  loadError: false,
+  tab: 'control',
+  intake: [],
+  s2: {},
+  force: {},
+  offRoster: [],       // rows whose owner is no longer on the roster
+  openResp: {},        // intake accordion
+  openPair: {},        // rivalry accordion
+  forceDraft: {},      // pairId|field -> text being typed
+  busy: ''             // surveyId currently being flipped
+};
+
+LeaguePin.onRender = function(){ render(); };
+LeaguePin.onSuccess = function(){ state.authed = true; boot(); };
+
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  app.appendChild(renderBanner({
+    tag: "COMMISSIONER'S DESK",
+    titleHtml: "Commissioner's<br>Desk",
+    subtitle: 'Open it, close it, reopen it. Nothing is ever deleted.',
+    nav: standardNav('desk')
+  }));
+
+  const main = document.createElement('main');
+  if(!state.authed){
+    main.innerHTML = LeaguePin.cardHtml("location.href='" + jsStr(hubHref()) + "'");
+    app.appendChild(main);
+    LeaguePin.shake = false;
+    return;
+  }
+
+  const tabs = [{ id:'control', title:'League Control' }]
+    .concat(SURVEYS.map(s => ({ id:s.id, title:s.short })));
+
+  main.innerHTML = `
+    <div class="tabbar">
+      ${tabs.map(t=>`<button class="tab ${t.id===state.tab?'active':''}" onclick="setTab('${jsStr(t.id)}')">${esc(t.title)}</button>`).join('')}
+    </div>
+    ${state.loading ? '<div class="res-card"><p class="empty-note">Pulling the latest…</p></div>'
+      : state.loadError ? '<div class="res-card"><p class="empty-note">Couldn\'t reach the league database.<br><button class="copy-btn" style="margin-top:12px" onclick="boot()">↻ Try again</button></p></div>'
+      : state.tab === 'control' ? renderControl()
+      : state.tab === 'intake'  ? renderIntakeTab()
+      : renderRivalryTab()}
+  `;
+  app.appendChild(main);
+}
+function setTab(id){ state.tab = id; render(); window.scrollTo(0,0); }
+
+
+/* ═════════════════ LEAGUE CONTROL ═════════════════ */
+function renderControl(){
+  const problems = pairConfigProblems();
+  const counts = { intake: state.intake.length, rivalry: Object.keys(state.s2).length };
+
+  return `
+    ${pairsAreAuto() || problems.length ? `
+      <div class="res-card">
+        <div class="setup-warn">
+          <strong>Setup needs your attention</strong>
+          ${pairsAreAuto() ? `<code>RIVAL_PAIRS</code> in <code>league.js</code> is empty, so rivalry pairings are being auto-generated from the Survey 1 beef rankings and <em>can change</em> as people submit. Set the fixed pairs before anyone starts negotiating.` : ''}
+          ${problems.length ? `<br><br>${problems.map(esc).join('<br>')}` : ''}
+        </div>
+      </div>` : ''}
+
+    ${state.offRoster.length ? `
+      <div class="res-card">
+        <p class="res-title">OFF THE ROSTER</p>
+        <p class="res-sub">${state.offRoster.length} saved response${state.offRoster.length===1?' belongs':'s belong'} to
+          ${state.offRoster.length===1?'someone':'people'} no longer in <code>ROSTER</code>. Excluded from every count,
+          tally and board so the numbers stay right — but still sitting in the Sheet. Delete the row${state.offRoster.length===1?'':'s'}
+          there if you want ${state.offRoster.length===1?'it':'them'} gone for good.</p>
+        ${state.offRoster.map(o=>`
+          <div class="cfield">
+            <div class="cf-row"><b>${esc(o.name)}</b> — ${esc(o.survey === 'intake' ? 'Pre-Season Intake' : 'Rivalry Week')} response</div>
+            <div class="cf-row" style="color:var(--ink-soft)">sheet row key: <code>${esc(o.survey === 'intake' ? 'response:' : 's2:')}${esc(o.name)}</code></div>
+          </div>`).join('')}
+      </div>` : ''}
+
+    <div class="res-card">
+      <p class="res-title">SURVEY STATUS</p>
+      <p class="res-sub">Closing a survey blocks new responses <strong>on the server</strong> — the page goes read-only and the write is rejected even if someone pokes at it. Everything already submitted stays exactly where it is, so reopening picks up right where you left off.</p>
+      ${SURVEYS.map(s => renderControlRow(s, counts[s.id] || 0)).join('')}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">WHAT EACH STATUS DOES</p>
+      ${STATUS_ORDER.map(k=>{
+        const m = STATUS_META[k];
+        const what = k==='draft' ? 'Hidden from the hub. Only you can see it. Use it to build a survey before releasing it.'
+                   : k==='open' ? 'Listed on the hub and accepting responses.'
+                   : k==='closed' ? 'Listed on the hub, page loads read-only, writes rejected. Results stay on the boards.'
+                   : 'Same as closed, but tucked into the hub\'s Archive section so the list stays clean.';
+        return `<div class="cfield"><div class="cf-k"><span class="st-badge ${k}">${esc(m.label)}</span></div><div class="cf-row">${esc(what)}</div></div>`;
+      }).join('')}
+      <div class="board-note">The <strong>boards</strong> never close. They keep working no matter what state their survey is in — that's what makes them safe to link in Sleeper.</div>
+    </div>`;
+}
+
+function renderControlRow(s, n){
+  const st = LeagueStatus.of(s.id);
+  const changed = LeagueStatus.changedAt(s.id);
+  const busy = state.busy === s.id;
+  return `
+    <div class="ctl-row">
+      <div class="ctl-name">
+        <b>${esc(s.title)}</b>
+        <small>${n} of ${ROSTER.length} responded${changed ? ' · ' + esc(STATUS_META[st].label.toLowerCase()) + ' ' + esc(fmtDate(changed)) : ''}</small>
+      </div>
+      <div class="ctl-btns">
+        ${STATUS_ORDER.map(k=>{
+          const cls = k===st ? ('on' + (k==='closed'?' warn':k==='draft'?' gold':'')) : '';
+          return `<button class="ctl-btn ${cls}" ${busy||k===st?'disabled':''} onclick="setStatus('${jsStr(s.id)}','${k}')">${esc(STATUS_META[k].label)}</button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+async function setStatus(surveyId, status){
+  state.busy = surveyId; render();
+  try{
+    await LeagueStatus.set(surveyId, status, COMMISH_PIN);
+    const s = surveyById(surveyId);
+    showToast((s ? s.short : surveyId) + ' → ' + STATUS_META[status].label, 'good');
+  }catch(e){
+    showToast('Could not change the status — ' + (e && e.message ? e.message : 'try again'), 'bad');
+  }
+  state.busy = ''; render();
+}
+
+
+/* ═════════════════ SURVEY 1 — INTAKE ═════════════════ */
+function renderIntakeTab(){
+  const rs = state.intake;
+  const st = LeagueStatus.of('intake');
+  if(!rs.length) return `<div class="res-card"><p class="empty-note">No intake responses yet.</p></div>`;
+
+  const missing = ROSTER.filter(n => !rs.some(r => r.name === n));
+  const buy = buyInTally(rs);
+  const ws = weekendStats(rs);
+  const rivalry = computeRivalryPairs(rs);
+
+  return `
+    <div class="res-card">
+      <p class="res-title">RESPONSES <span class="st-badge ${st}" style="margin-left:6px">${esc(STATUS_META[st].label)}</span></p>
+      <div class="prog-line"><strong>${rs.length} / ${ROSTER.length}</strong> locked in<span>${Math.round(rs.length/ROSTER.length*100)}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(rs.length/ROSTER.length*100).toFixed(1)}%"></div></div>
+      ${missing.length ? `<p class="waiting" style="margin-top:9px">Still waiting on: ${missing.map(esc).join(', ')}</p>` : `<p class="waiting" style="margin-top:9px">Everyone's in. 🏈</p>`}
+      <div class="copy-row" style="justify-content:flex-start;margin-top:12px">
+        <button class="copy-btn" onclick="boot()">↻ Refresh</button>
+        <button class="copy-btn" onclick="location.href='boards.html#draft'">Draft Day board →</button>
+        <button class="copy-btn" onclick="location.href='boards.html#pot'">The Pot board →</button>
+      </div>
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">BUY-IN VOTE</p>
+      ${BUYINS.map(b=>`
+        <div class="bar-row">
+          <div class="bar-label"><span class="bl-l">${esc(b)}</span><span class="bl-r">${buy.counts[b]}</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(buy.counts[b]/buy.max)*100}%"></div></div>
+        </div>`).join('')}
+      <p class="res-sub" style="margin-top:8px">Full split and dollar amounts on <a href="boards.html#pot">The Pot</a>.</p>
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">PUNISHMENT IDEAS</p>
+      <p class="res-sub">These feed the Survey 2 ballot automatically.</p>
+      ${rs.filter(r=>clean(r.punishment)).map(r=>`
+        <div class="quote-item"><span class="who">${esc(r.name)}</span>${esc(r.punishment)}</div>`).join('')
+        || '<p class="empty-note">Nobody wrote one.</p>'}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">DRAFT WEEKEND — RANKED</p>
+      ${ws.ranked.map(s=>`
+        <div class="wk-result-block">
+          <div class="wk-result">
+            <div class="l">${esc(s.wk.label)}${ws.best && s.avg===ws.best.avg?'<span class="frontrunner">FRONTRUNNER</span>':''}</div>
+            <div class="r">avg rank ${s.avg.toFixed(1)} · ${s.available} in${s.fullyOut?` · ${s.fullyOut} out`:''}</div>
+          </div>
+          <div class="day-breakdown">
+            ${s.wk.days.map(d=>`<span class="day-stat ${s.dayOut[d.id]?'has-out':''}">${esc(d.short)} · ${s.dayOut[d.id] ? s.dayOut[d.id]+' out' : 'clear'}</span>`).join('')}
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">SUGGESTED RIVALRY PAIRINGS</p>
+      <p class="res-sub">Auto-matched from everyone's beef rankings — strongest mutual first. ${pairsAreAuto()
+        ? 'These are <strong>live</strong> because <code>RIVAL_PAIRS</code> is empty. Copy the ones you like into league.js to freeze them.'
+        : 'For reference only — your fixed <code>RIVAL_PAIRS</code> are what Survey 2 actually uses.'}</p>
+      ${rivalry.matched.length ? rivalry.matched.map(p=>{
+        const s = rivalStrength(p.score);
+        return `
+        <div class="rival-pair">
+          <div class="rp-top">
+            <span class="rp-names">${esc(p.a)} <span class="rp-vs">⚔️</span> ${esc(p.b)}</span>
+            <span class="rp-badge ${s.cls}">${esc(s.label)} · ${s.pct}%</span>
+          </div>
+          <div class="rp-detail">${esc(p.a)} ranks ${esc(p.b)} #${p.rankAB} · ${esc(p.b)} ranks ${esc(p.a)} #${p.rankBA}</div>
+        </div>`;
+      }).join('') : `<p class="empty-note">Not enough data yet — need at least two responses.</p>`}
+      ${rivalry.matched.length ? `<div class="copy-row" style="justify-content:flex-start;margin-top:12px">
+        <button class="copy-btn" onclick="copyPairs()">📋 Copy as RIVAL_PAIRS code</button></div>` : ''}
+      ${rivalry.unpaired.length ? `
+        <div class="rp-none-head">No current pair</div>
+        ${rivalry.unpaired.map(n=>`<div class="rp-none">${esc(n)} — waiting on a match as more people submit</div>`).join('')}
+      ` : ''}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">INDIVIDUAL RESPONSES</p>
+      <p class="res-sub">Tap a name to see their full submission.</p>
+      ${rs.map(renderIntakeResp).join('')}
+    </div>`;
+}
+
+/* Hands you the exact code block to paste into league.js. */
+function copyPairs(){
+  const rivalry = computeRivalryPairs(state.intake);
+  const w = Math.max.apply(null, rivalry.matched.map(p => p.a.length + 2));
+  const body = rivalry.matched
+    .map(p => "  ['" + p.a + "'," + ' '.repeat(Math.max(1, w - p.a.length - 1)) + "'" + p.b + "'],")
+    .join('\n');
+  copyText('var RIVAL_PAIRS = [\n' + body + '\n];', 'Copied — paste it over RIVAL_PAIRS in league.js');
+}
+
+function renderIntakeResp(r){
+  const open = !!state.openResp[r.name];
+  const cm = r.cantMake || {};
+  const draftLines = (r.weekendOrder||[]).map((id,idx)=>{
+    const wk = WEEKENDS.find(w=>w.id===id); if(!wk) return '';
+    const cantDays = wk.days.filter(d=>cm[d.id]);
+    const allOut = cantDays.length===wk.days.length;
+    let status;
+    if(allOut) status = `<span class="rl-out">can't make it</span>`;
+    else if(cantDays.length) status = 'out: ' + cantDays.map(d=>esc(d.short.split(' ').slice(0,2).join(' '))).join(', ');
+    else status = 'all dates open';
+    const mode = (r.locality==='oot' && !allOut) ? ` · ${(r.inPerson&&r.inPerson[id]===false)?'virtual':'in person'}` : '';
+    return `<div>${idx+1}. <strong>${esc(wk.label)}</strong> — ${status}${mode}</div>`;
+  }).join('');
+  const beefLines = (r.beefOrder||[]).length
+    ? (r.beefOrder||[]).map((n,i)=>`${i+1}. ${esc(n)}`).join(' · ') : '—';
+  return `
+    <div class="resp-item ${open?'open':''}">
+      <div class="resp-head" onclick="toggleResp('${jsStr(r.name)}')">
+        <span class="resp-who">${esc(r.name)}</span>
+        <span class="resp-meta">${esc(r.buyIn||'—')} · ${r.locality==='oot'?'OOT':(r.locality==='local'?'Local':'—')}</span>
+        <span class="resp-chev">${open?'▲':'▼'}</span>
+      </div>
+      ${open ? `<div class="resp-body">
+        <div class="resp-line"><span class="rl-k">Buy-in</span><span class="rl-v">${esc(r.buyIn||'—')}</span></div>
+        <div class="resp-line"><span class="rl-k">Coming from</span><span class="rl-v">${esc(localityLabel(r.locality))}</span></div>
+        <div class="resp-line"><span class="rl-k">Punishment</span><span class="rl-v">${esc(r.punishment||'—')}</span></div>
+        <div class="resp-line"><span class="rl-k">Prize split</span><span class="rl-v">${esc(prizePlanText(r.prizePlan))}</span></div>
+        <div class="resp-line col"><span class="rl-k">Draft availability</span><div class="rl-v">${draftLines||'—'}</div></div>
+        <div class="resp-line col"><span class="rl-k">Rivalries<br><small>most → least</small></span><div class="rl-v">${beefLines}</div></div>
+        ${r.submittedAt?`<div class="resp-subline">submitted ${esc(fmtDate(r.submittedAt))}</div>`:''}
+      </div>` : ''}
+    </div>`;
+}
+function toggleResp(name){ state.openResp[name] = !state.openResp[name]; render(); }
+
+
+/* ═════════════════ SURVEY 2 — RIVALRY WEEK ═════════════════ */
+function renderRivalryTab(){
+  const rows = Object.keys(state.s2).map(k=>state.s2[k]);
+  const st = LeagueStatus.of('rivalry');
+  const missing = ROSTER.filter(n => !state.s2[n]);
+  const pairs = activePairs(state.intake);
+  const ballot = buildBallot(state.intake, state.s2);
+  const pun = punishmentTally(state.s2, ballot);
+  const maxPts = pun.length ? pun[0].pts : 0;
+  const tgt = targetTally(state.s2);
+  const maxTgt = tgt.rows.length ? Math.max(1, tgt.rows[0].n) : 1;
+
+  return `
+    <div class="res-card">
+      <p class="res-title">TURNOUT <span class="st-badge ${st}" style="margin-left:6px">${esc(STATUS_META[st].label)}</span></p>
+      <div class="prog-line"><span><strong>${rows.length}</strong> of ${ROSTER.length} have voted</span><span>${Math.round(rows.length/ROSTER.length*100)}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(rows.length/ROSTER.length*100).toFixed(1)}%"></div></div>
+      ${missing.length ? `<p class="waiting" style="margin-top:9px">Still waiting on: ${missing.map(esc).join(', ')}</p>` : `<p class="waiting" style="margin-top:9px">Everyone's in. Miracle.</p>`}
+      <div class="copy-row" style="justify-content:flex-start;margin-top:12px">
+        <button class="copy-btn" onclick="boot()">↻ Refresh</button>
+        <button class="copy-btn" onclick="location.href='boards.html#rivalry'">Rivalry Board →</button>
+      </div>
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">PUNISHMENT VOTE</p>
+      <p class="res-sub">Ranked-choice: 1st = ${PODIUM_SIZE}pts down to 1pt. "Firsts" is how many put it top.</p>
+      ${pun.length ? pun.map((p,i)=>`
+        <div class="bar-row">
+          <div class="bar-label">
+            <span class="bl-l">${esc(p.text)}${i===0?'<span class="frontrunner">LEADER</span>':''}</span>
+            <span class="bl-r">${p.pts} pts · ${p.firsts} firsts</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill ${i===0?'gold':''}" style="width:${maxPts?(p.pts/maxPts*100).toFixed(1):0}%"></div></div>
+        </div>`).join('') : `<p class="empty-note">No votes cast yet.</p>`}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">WHO TAKES THE PUNISHMENT</p>
+      ${tgt.rows.map((t,i)=>`
+        <div class="bar-row">
+          <div class="bar-label"><span class="bl-l">${esc(t.label)}${i===0&&t.n>0?'<span class="frontrunner">LEADER</span>':''}</span><span class="bl-r">${t.n} vote${t.n===1?'':'s'}</span></div>
+          <div class="bar-track"><div class="bar-fill ${i===0&&t.n>0?'gold':''}" style="width:${(t.n/maxTgt*100).toFixed(1)}%"></div></div>
+        </div>`).join('')}
+      ${tgt.writeins.length ? `<p class="res-title" style="margin-top:14px">WRITE-INS</p>
+        ${tgt.writeins.map(w=>`<div class="quote-item"><span class="who">${esc(w.who)}</span>${esc(w.text)}</div>`).join('')}` : ''}
+    </div>
+
+    <div class="res-card">
+      <p class="res-title">RIVALRY NEGOTIATIONS</p>
+      <p class="res-sub">Tap a pairing to see both sides. A line locks itself when both rivals back the same thing — use <strong>Force</strong> only when a pair is genuinely stuck.</p>
+      ${pairs.length ? pairs.map(p=>renderCommishPair(p[0],p[1])).join('') : `<p class="empty-note">No pairings configured.</p>`}
+    </div>`;
+}
+
+function renderCommishPair(a,b){
+  const pid = pairIdOf(a,b);
+  const open = !!state.openPair[pid];
+  const settled = pairSettledCount(a,b,state.s2,state.force);
+  const ra = state.s2[a], rb = state.s2[b];
+
+  return `
+    <div class="cpair ${settled===NEG_FIELDS.length?'done':''}">
+      <div class="cpair-head" onclick="togglePair('${jsStr(pid)}')">
+        <span class="cpair-who">${esc(a)} vs ${esc(b)}</span>
+        <span class="cpair-meta">${settled}/${NEG_FIELDS.length}</span>
+        <span class="resp-chev">${open?'▲':'▼'}</span>
+      </div>
+      ${open ? `<div class="cpair-body">
+        <div class="cfield">
+          <div class="cf-row">${esc(a)}: ${ra ? 'responded ' + esc(fmtDate(ra.updatedAt)) : '<em>no response yet</em>'}</div>
+          <div class="cf-row theirs">${esc(b)}: ${rb ? 'responded ' + esc(fmtDate(rb.updatedAt)) : '<em>no response yet</em>'}</div>
+        </div>
+        ${NEG_FIELDS.map(f=>{
+          const st = fieldStatus(a,b,f.key,state.s2,state.force);
+          const pa = clean(ra && ra.picks && ra.picks[f.key]);
+          const pb = clean(rb && rb.picks && rb.picks[f.key]);
+          const oa = clean(ra && ra.proposals && ra.proposals[f.key]);
+          const ob = clean(rb && rb.proposals && rb.proposals[f.key]);
+          const dk = pid + '|' + f.key;
+          return `
+            <div class="cfield">
+              <div class="cf-k">${esc(f.tag)}</div>
+              <div class="cf-row"><b>${esc(firstName(a))} proposed:</b> ${oa?esc(oa):'—'}</div>
+              <div class="cf-row theirs"><b>${esc(firstName(b))} proposed:</b> ${ob?esc(ob):'—'}</div>
+              <div class="cf-row"><b>${esc(firstName(a))} backs:</b> ${pa?esc(pa):'—'}</div>
+              <div class="cf-row theirs"><b>${esc(firstName(b))} backs:</b> ${pb?esc(pb):'—'}</div>
+              ${st.state==='forced'
+                ? `<div class="cf-res ok">⚖ RULED: ${esc(st.value)}</div>
+                   <div class="force-box"><button class="force-btn clear" style="flex:1" onclick="clearForce('${jsStr(pid)}','${jsStr(f.key)}')">Undo ruling — hand it back to them</button></div>`
+                : st.state==='agreed'
+                ? `<div class="cf-res ok">✓ AGREED: ${esc(st.value)}</div>`
+                : `<div class="cf-res no">✗ Not agreed</div>
+                   <div class="force-box">
+                     <input type="text" data-force="${esc(dk)}" placeholder="Force a ruling…" value="${esc(state.forceDraft[dk]||'')}">
+                     <button class="force-btn" onclick="forceField('${jsStr(pid)}','${jsStr(f.key)}','${jsStr(a)}','${jsStr(b)}')">Force</button>
+                   </div>`}
+            </div>`;
+        }).join('')}
+      </div>` : ''}
+    </div>`;
+}
+function togglePair(pid){ syncForceInputs(); state.openPair[pid] = !state.openPair[pid]; render(); }
+function syncForceInputs(){
+  document.querySelectorAll('[data-force]').forEach(t=>{ state.forceDraft[t.getAttribute('data-force')] = t.value; });
+}
+
+async function forceField(pid, fkey, a, b){
+  syncForceInputs();
+  const dk = pid + '|' + fkey;
+  const val = clean(state.forceDraft[dk]);
+  if(!val){ showToast('Type the ruling first',''); return; }
+  const existing = state.force[pid] || { __kind:'s2force', pairId:pid, a:a, b:b };
+  const payload = Object.assign({}, existing, {
+    __kind:'s2force', pairId:pid, a:a, b:b, updatedAt:new Date().toISOString()
+  });
+  payload[fkey] = val;
+  try{
+    await LeagueStore.set('s2force:' + pid, JSON.stringify(payload), { pin: COMMISH_PIN });
+    state.force[pid] = payload;
+    state.forceDraft[dk] = '';
+    showToast('Ruling locked in','good');
+  }catch(e){ showToast('Could not save the ruling','bad'); }
+  render();
+}
+async function clearForce(pid, fkey){
+  const existing = state.force[pid];
+  if(!existing) return;
+  const payload = Object.assign({}, existing, { updatedAt:new Date().toISOString() });
+  payload[fkey] = '';
+  try{
+    await LeagueStore.set('s2force:' + pid, JSON.stringify(payload), { pin: COMMISH_PIN });
+    state.force[pid] = payload;
+    showToast('Ruling withdrawn','good');
+  }catch(e){ showToast('Could not withdraw the ruling','bad'); }
+  render();
+}
+
+
+/* ═════════════════ BOOT ═════════════════ */
+async function boot(){
+  state.loading = true; render();
+  try{
+    const d = await LeagueStore.list();   // the desk wants everything
+    state.intake = d.intake;
+    state.s2 = d.rivalry;
+    state.force = d.force;
+    state.offRoster = d.offRoster;
+    LeagueStatus.hydrate(d.status);
+    state.loadError = false;
+  }catch(e){ state.loadError = true; }
+  state.loading = false;
+  render();
+}
+render();
+</script>
+</body>
+</html>

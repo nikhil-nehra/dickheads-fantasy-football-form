@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rivalry Week &amp; The Punishment — The Dickhead's League</title>
+<link rel="stylesheet" href="league.css">
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Shared core: roster, PIN, backend, ballot, rivalry pairs, negotiation rules.
+     Edit league.js, not this file, to change any of those. -->
+<script src="league.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   SURVEY 2 — RIVALRY WEEK & THE PUNISHMENT
+   ═══════════════════════════════════════════════════════════════════════
+   Rank the punishment, vote on who serves it, then negotiate your rivalry.
+
+   The public board now lives in boards.html and the commissioner's view in
+   desk.html. This file is just the form.
+
+   Storage (all in the same sheet, never touching Survey 1's rows):
+       s2:<Player Name>   one row per player — only that player ever writes it
+   "Agreed" is derived by comparing two players' picks, so there is no lock to
+   win and nobody can lock their rival out.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+var SURVEY_ID = 'rivalry';
+
+let state = {
+  loading: true,
+  loadError: false,
+
+  survey1: [],   // Survey 1 rows — feed the ballot and the fallback pairing
+  s2: {},        // name -> saved Survey 2 row
+  force: {},     // pairId -> commissioner ruling
+
+  name: '',
+  animateNag: false,
+
+  podium: [],                                 // ballot ids, max PODIUM_SIZE
+  punishWrite: '',
+  targetVote: '',
+  targetWrite: '',
+  proposals: { rname:'', bet:'', side:'' },   // what I put forward
+  picks:     { rname:'', bet:'', side:'' },   // what I'm currently backing
+  thirdText: { rname:'', bet:'', side:'' },   // the "something else" box
+  pickMode:  { rname:'', bet:'', side:'' },   // 'mine' | 'theirs' | 'third'
+
+  dirty: false,
+  saving: false,
+  savedAt: null,
+  statusKnown: false
+};
+
+/* league.js keeps the shared rules data-agnostic; these bind them to this
+   page's state so the rest of the file reads the way it always did. */
+function myBallot(){ return buildBallot(state.survey1, state.s2); }
+function myBallotById(id){ return ballotById(myBallot(), id); }
+function myRival(name){ return rivalOf(name, state.survey1); }
+function fStatus(a,b,k){ return fieldStatus(a,b,k,state.s2,state.force); }
+function settledCount(a,b){ return pairSettledCount(a,b,state.s2,state.force); }
+function isOpen(){ return LeagueStatus.isOpen(SURVEY_ID); }
+
+var POLL_PREFIXES = ['s2:','s2force:'];
+var FULL_PREFIXES = ['response:','s2:','s2force:'];
+
+/* silent = a background poll. Those only refetch Survey 2 rows: the Survey 1
+   data behind the ballot doesn't change often enough to re-download every
+   15 seconds, and a poll must never clobber what someone is typing. */
+async function loadAll(silent){
+  if(!silent){ state.loading = true; render(); }
+  try{
+    const d = await LeagueStore.list(silent ? POLL_PREFIXES : FULL_PREFIXES);
+    if(!silent) state.survey1 = d.intake;
+    state.s2 = d.rivalry;
+    state.force = d.force;
+    LeagueStatus.hydrate(d.status);
+    state.statusKnown = true;
+    state.loadError = false;
+  }catch(e){
+    state.loadError = true;
+  }
+  state.loading = false;
+  if(silent){
+    const a = document.activeElement;
+    if(a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT')) return;
+  }
+  render();
+}
+
+function renderHeader(){
+  return renderBanner({
+    tag: 'RIVALRY WEEK · 2026',
+    titleHtml: 'Rivalry Week<br>&amp; The Punishment',
+    subtitle: 'Vote on who suffers and what they suffer. Then settle your beef in writing.',
+    nav: standardNav(SURVEY_ID)
+  });
+}
+
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  app.appendChild(renderHeader());
+
+  const main = renderForm();
+  if(!isOpen() && state.statusKnown && !state.loading) applyReadOnly(main);
+  app.appendChild(main);
+
+  if(isOpen() && state.name && !state.loading) app.appendChild(renderSaveBar());
+  state.animateNag = false;
+  wireInputs();
+}
+
+function applyReadOnly(main){
+  const meta = LeagueStatus.meta(SURVEY_ID);
+  const st = LeagueStatus.of(SURVEY_ID);
+  const card = main.querySelector('.card');
+  if(card) card.classList.add('readonly');
+
+  const banner = document.createElement('div');
+  banner.className = 'closed-banner' + (st === 'draft' ? ' draft' : '');
+  banner.innerHTML = st === 'draft'
+    ? '<strong>Not released yet.</strong> The commissioner hasn\'t opened this to the league. You\'re seeing a preview.'
+    : '<strong>' + esc(meta.hubLabel) + '.</strong> Voting and rivalry negotiation are locked. '
+      + 'Everything you agreed is on the <a href="boards.html#rivalry">Rivalry Board</a>.';
+  main.insertBefore(banner, main.firstChild);
+
+  const sel = main.querySelector('#nameSelect');
+  if(sel) sel.disabled = false;
+}
+
+let pollTimer = null;
+function startPolling(){
+  clearInterval(pollTimer);
+  pollTimer = setInterval(function(){
+    if(document.hidden || state.saving) return;
+    if(!isOpen()) return;                       // nothing moves in a closed survey
+    if(state.name && myRival(state.name)) loadAll(true);
+  }, POLL_MS);
+}
+
+(async function boot(){
+  render();
+  await loadAll(false);
+  if(state.name) hydrateMe();
+  startPolling();
+})();
+
+function renderForm(){
+  const wrap = document.createElement('main');
+
+  if(state.loading){
+    wrap.innerHTML = `<div class="card"><p class="empty-note">Pulling the league's paperwork…</p></div>`;
+    return wrap;
+  }
+  if(state.loadError){
+    wrap.innerHTML = `
+      <div class="card">
+        <div class="setup-warn">
+          <strong>Can't reach the league database.</strong>
+          The form loaded but couldn't read or write responses. Usually the Apps Script
+          deployment's access level isn't set to <code>Anyone</code>, or <code>API_URL</code> is wrong.
+        </div>
+        <button class="lock-btn" onclick="loadAll(false)">Try again</button>
+      </div>`;
+    return wrap;
+  }
+
+  wrap.innerHTML = `
+    <div class="card">
+
+      <div class="section">
+        <div class="down-tag">STARTING LINEUP</div>
+        <p class="q-text">Who's filling this out?</p>
+        <select id="nameSelect">
+          <option value="">Select your name…</option>
+          ${ROSTER.map(n=>`<option value="${esc(n)}" ${state.name===n?'selected':''}>${esc(n)}</option>`).join('')}
+        </select>
+        ${state.name ? `<p class="name-nag${state.animateNag?' animate':''}"><span>Yes, it's <em>still</em> a name dropdown with no password. Yes, I <em>still</em> trust you. Don't make this weird.</span></p>` : ''}
+        ${state.name && state.s2[state.name] ? `<p class="dupe-note">Loaded your saved answers from ${esc(fmtDate(state.s2[state.name].updatedAt)) || 'earlier'}. Change whatever you like — saving overwrites the old version.</p>` : ''}
+      </div>
+
+      ${state.name ? renderPunishmentSection() : ''}
+      ${state.name ? renderTargetSection() : ''}
+      ${state.name ? renderRivalrySection() : ''}
+
+      ${!state.name ? `<div class="section"><p class="empty-note">Pick your name above and the rest of the form appears.</p></div>` : ''}
+    </div>
+  `;
+  return wrap;
+}
+
+function renderPunishmentSection(){
+  const ballot = myBallot();
+  const podium = state.podium;
+
+  const slots = podium.length ? podium.map((id,i)=>{
+    const o = myBallotById(id);
+    const medal = ['🥇','🥈','🥉'][i] || (i+1)+'.';
+    return `
+      <div class="podium-slot ${i===0?'p1':''}">
+        <span class="podium-medal">${medal}</span>
+        <span class="podium-txt">${esc(o ? o.text : '(removed option)')}</span>
+        <span class="podium-pts">${PODIUM_SIZE - i} pt${(PODIUM_SIZE-i)===1?'':'s'}</span>
+        <button class="podium-x" onclick="unpick(${i})" title="Remove">✕</button>
+      </div>`;
+  }).join('') : `<div class="podium-empty">Your ballot is empty.<br>Tap options below in order — 1st choice first.</div>`;
+
+  return `
+    <div class="section">
+      <div class="down-tag red">1ST DOWN · THE PUNISHMENT</div>
+      <p class="q-text">Rank your top ${PODIUM_SIZE} punishments</p>
+      <p class="q-help">Tap them in order of preference — first tap is your 1st choice. Scoring is ${Array.from({length:PODIUM_SIZE},(_,i)=>PODIUM_SIZE-i).join('/')} points, so your top pick carries the most weight.</p>
+
+      <div class="podium">${slots}</div>
+
+      ${ballot.length ? `<div class="pun-list">
+        ${ballot.map(o=>{
+          const idx = podium.indexOf(o.id);
+          const picked = idx >= 0;
+          const full = !picked && podium.length >= PODIUM_SIZE;
+          const badge = picked ? (idx+1) : '+';
+          const src = o.source==='commish' ? '<span class="pun-src commish">★ On the official shortlist</span>'
+                    : o.source==='writein' ? `<span class="pun-src">Written in by ${esc(o.by||'someone')}</span>`
+                    : `<span class="pun-src">Suggested by ${esc(o.by||'someone')} in Survey 1</span>`;
+          return `
+            <div class="pun-opt ${picked?'picked':''} ${full?'full':''}" onclick="pickPunishment('${jsStr(o.id)}')">
+              <span class="pun-pick-badge">${badge}</span>
+              <span class="pun-body"><span class="pun-txt">${esc(o.text)}</span>${src}</span>
+            </div>`;
+        }).join('')}
+      </div>` : `<p class="empty-note">No punishment options yet. The commissioner needs to add some to <code>COMMISSIONER_PUNISHMENTS</code>${INCLUDE_SURVEY1_IDEAS?', or nobody wrote one in Survey 1':''}.</p>`}
+
+      ${ALLOW_PUNISHMENT_WRITEIN ? `
+        <div class="writein-box">
+          <label class="writein-lbl" for="punWrite">NOT ON THE LIST? ADD ONE</label>
+          <textarea id="punWrite" placeholder="Your own diabolical suggestion — it joins the ballot for everyone once you save">${esc(state.punishWrite)}</textarea>
+        </div>` : ''}
+    </div>`;
+}
+
+function pickPunishment(id){
+  const i = state.podium.indexOf(id);
+  if(i >= 0){ state.podium.splice(i,1); }
+  else {
+    if(state.podium.length >= PODIUM_SIZE){ showToast(`You've already picked ${PODIUM_SIZE} — remove one first`,''); render(); return; }
+    state.podium.push(id);
+  }
+  state.dirty = true;
+  render();
+}
+
+function unpick(i){ state.podium.splice(i,1); state.dirty = true; render(); }
+
+function renderTargetSection(){
+  return `
+    <div class="section">
+      <div class="down-tag red">2ND DOWN · THE VICTIM</div>
+      <p class="q-text">Who actually has to do the punishment?</p>
+      <p class="q-help">Pick one. This is the part people always argue about in January, so let's settle it in August.</p>
+      <div class="target-list">
+        ${PUNISHMENT_TARGETS.map(t=>`
+          <div class="target-opt ${state.targetVote===t.id?'sel':''}" onclick="setTarget('${jsStr(t.id)}')">
+            <span class="target-radio"></span>
+            <span><span class="target-l">${esc(t.label)}</span><span class="target-s">${esc(t.sub||'')}</span></span>
+          </div>`).join('')}
+        ${ALLOW_TARGET_WRITEIN ? `
+          <div class="target-opt ${state.targetVote==='__other'?'sel':''}" onclick="setTarget('__other')">
+            <span class="target-radio"></span>
+            <span style="flex:1"><span class="target-l">Something else</span>
+              ${state.targetVote==='__other' ? `<input type="text" id="targetWrite" class="third-input" placeholder="Then who?" value="${esc(state.targetWrite)}" onclick="event.stopPropagation()">` : `<span class="target-s">You explain it, you defend it.</span>`}
+            </span>
+          </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function setTarget(id){ state.targetVote = id; state.dirty = true; render(); }
+
+function renderRivalrySection(){
+  const me = state.name;
+  const rival = myRival(me);
+
+  if(!rival){
+    return `
+      <div class="section">
+        <div class="down-tag">3RD DOWN · RIVALRY WEEK</div>
+        <p class="q-text">Your rivalry</p>
+        <div class="no-rival">
+          You don't have a rival assigned yet.<br>
+          ${pairsAreAuto()
+            ? 'Pairings are currently being auto-generated from the Survey 1 beef rankings, and you’re either unpaired or haven’t filled out Survey 1.'
+            : 'The commissioner hasn’t put you in a pairing.'}
+          <br><br>Nudge the commissioner and check back.
+        </div>
+      </div>`;
+  }
+
+  const theirRow = state.s2[rival];
+  const theyStarted = !!theirRow;
+  const settled = settledCount(me, rival);
+
+  return `
+    <div class="section">
+      <div class="down-tag">3RD DOWN · RIVALRY WEEK</div>
+      <p class="q-text">Settle it with ${esc(firstName(rival))}</p>
+      <p class="q-help">You both propose, you both see everything, and each line only locks when the <strong>two of you land on the same answer</strong>. You can back your own idea, back theirs, or write a third option you both prefer.</p>
+
+      <div class="vs-block">
+        <div class="vs-eyebrow">RIVALRY WEEK MATCHUP</div>
+        <div class="vs-names">
+          <span class="vs-name">${esc(me)}</span>
+          <span class="vs-mid">VS</span>
+          <span class="vs-name">${esc(rival)}</span>
+        </div>
+        <div class="vs-foot">${settled} of ${NEG_FIELDS.length} agreed${theyStarted ? '' : ' · ' + esc(firstName(rival)) + " hasn't opened this yet"}</div>
+      </div>
+
+      ${NEG_FIELDS.map(f => renderNegCard(f, me, rival, theirRow)).join('')}
+    </div>`;
+}
+
+function renderNegCard(f, me, rival, theirRow){
+  const st = fStatus(me, rival, f.key);
+  const mineProp   = clean(state.proposals[f.key]);
+  const theirsProp = clean(theirRow && theirRow.proposals && theirRow.proposals[f.key]);
+  const myPick     = clean(state.picks[f.key]);
+  const theirPick  = clean(theirRow && theirRow.picks && theirRow.picks[f.key]);
+  const mode       = state.pickMode[f.key];
+
+  const statusCls = st.state === 'forced' ? 'forced' : st.state === 'agreed' ? 'agreed' : st.state === 'waiting' ? 'wait' : 'open';
+  const statusTxt = st.state === 'forced' ? "COMMISSIONER'S RULING"
+                  : st.state === 'agreed' ? '✓ AGREED'
+                  : st.state === 'waiting' ? 'NOT AGREED' : 'OPEN';
+
+  // Settled — show the stamp, with an escape hatch if it was mutual (not forced).
+  if(st.state === 'forced' || st.state === 'agreed'){
+    return `
+      <div class="neg-card ${st.state}">
+        <div class="neg-head">
+          <span class="neg-tag">${esc(f.tag)}</span>
+          <span class="neg-status ${statusCls}">${statusTxt}</span>
+        </div>
+        <div class="neg-body">
+          <div class="agreed-stamp ${st.state==='forced'?'forced':''}">
+            <div class="as-lbl">${st.state==='forced' ? 'RULED BY THE COMMISSIONER' : 'YOU BOTH AGREED ON'}</div>
+            <div class="as-val">${esc(st.value)}</div>
+          </div>
+          ${st.state === 'forced'
+            ? `<div class="neg-foot info">The commissioner settled this one. Take it up with him.</div>`
+            : `<button class="neg-btn undo" onclick="reopenField('${jsStr(f.key)}')">Changed your mind? Reopen this line</button>`}
+        </div>
+      </div>`;
+  }
+
+  // Still open — full negotiation UI.
+  // NOTE: the "mine" option is ALWAYS clickable, even before anything is typed.
+  // Its text is kept in sync live by refreshChrome() as the person types, so the
+  // radio never goes stale between full re-renders. The Lock button is what
+  // actually gates on there being something to lock.
+  const rivalUp = esc(firstName(rival).toUpperCase());
+
+  return `
+    <div class="neg-card" data-fkey="${esc(f.key)}">
+      <div class="neg-head">
+        <span class="neg-tag">${esc(f.tag)}</span>
+        <span class="neg-status ${statusCls}">${statusTxt}</span>
+      </div>
+      <div class="neg-body">
+        <p class="neg-q">${esc(f.q)}</p>
+        <p class="neg-help">${esc(f.help)}</p>
+
+        <div class="prop-grid">
+          <div class="prop-box">
+            <div class="prop-who">YOUR PROPOSAL</div>
+            <textarea data-prop="${esc(f.key)}" placeholder="${esc(f.ph)}">${esc(state.proposals[f.key]||'')}</textarea>
+          </div>
+          <div class="prop-box theirs">
+            <div class="prop-who">${rivalUp}'S PROPOSAL</div>
+            <div class="prop-val ${theirsProp?'':'none'}">${theirsProp ? esc(theirsProp) : esc(firstName(rival)) + " hasn't proposed anything here yet."}</div>
+          </div>
+        </div>
+
+        <div class="pick-lbl">WHICH ONE ARE YOU BACKING?</div>
+        <div class="pick-list">
+
+          <div class="pick-opt ${mode==='mine'?'sel':''}" data-pickopt="${esc(f.key)}:mine"
+               onclick="setPickMode('${jsStr(f.key)}','mine')">
+            <span class="pick-radio"></span>
+            <span class="pick-txt ${mineProp?'':'muted'}">
+              <span class="pick-side">YOUR PROPOSAL</span><span class="pick-val">${mineProp ? esc(mineProp) : 'Type your proposal above and it appears here'}</span>
+            </span>
+          </div>
+
+          <div class="pick-opt ${mode==='theirs'?'sel':''} ${theirsProp?'':'dim'}"
+               ${theirsProp?`onclick="setPickMode('${jsStr(f.key)}','theirs')"`:''}>
+            <span class="pick-radio"></span>
+            <span class="pick-txt ${theirsProp?'':'muted'}">
+              <span class="pick-side">${rivalUp}'S PROPOSAL</span><span class="pick-val">${theirsProp ? esc(theirsProp) : esc(firstName(rival)) + " hasn't proposed anything yet"}</span>
+            </span>
+          </div>
+
+          <div class="pick-opt ${mode==='third'?'sel':''}" onclick="setPickMode('${jsStr(f.key)}','third')">
+            <span class="pick-radio"></span>
+            <span style="flex:1">
+              <span class="pick-side">A THIRD OPTION</span>
+              ${mode==='third'
+                ? `<input type="text" data-third="${esc(f.key)}" class="third-input" placeholder="Type the compromise you both live with" value="${esc(state.thirdText[f.key]||'')}" onclick="event.stopPropagation()">`
+                : `<span class="pick-txt muted">Neither. Write something you both prefer.</span>`}
+            </span>
+          </div>
+        </div>
+
+        <button class="neg-btn" ${pickReady(f.key)?'':'disabled'} onclick="lockPick('${jsStr(f.key)}')">
+          ${myPick ? 'Update my pick' : 'Lock in my pick'}
+        </button>
+
+        ${negFoot(f, rival, myPick, theirPick)}
+      </div>
+    </div>`;
+}
+
+function negFoot(f, rival, myPick, theirPick){
+  const rn = esc(firstName(rival));
+  if(myPick && theirPick){
+    return `<div class="neg-foot wait">You're backing <strong>“${esc(myPick)}”</strong> — ${rn} is backing <strong>“${esc(theirPick)}”</strong>. One of you has to blink. It locks the moment you match.</div>`;
+  }
+  if(myPick && !theirPick){
+    return `<div class="neg-foot wait">You're locked onto <strong>“${esc(myPick)}”</strong>. Waiting on ${rn} to pick the same thing.</div>`;
+  }
+  if(!myPick && theirPick){
+    return `<div class="neg-foot wait">${rn} is backing <strong>“${esc(theirPick)}”</strong>. Match it and this line locks immediately.</div>`;
+  }
+  return `<div class="neg-foot info">Neither of you has backed anything yet. Propose something, then pick.</div>`;
+}
+
+function pickReady(fkey){
+  const m = state.pickMode[fkey];
+  if(m === 'mine')   return !!clean(state.proposals[fkey]);
+  if(m === 'theirs'){
+    const rival = myRival(state.name); const r = rival ? state.s2[rival] : null;
+    return !!clean(r && r.proposals && r.proposals[fkey]);
+  }
+  if(m === 'third')  return !!clean(state.thirdText[fkey]);
+  return false;
+}
+
+function setPickMode(fkey, mode){
+  syncInputs();
+  state.pickMode[fkey] = mode;
+  render();
+}
+
+async function lockPick(fkey){
+  syncInputs();
+  const m = state.pickMode[fkey];
+  let val = '';
+  if(m === 'mine')  val = clean(state.proposals[fkey]);
+  if(m === 'theirs'){
+    const rival = myRival(state.name); const r = rival ? state.s2[rival] : null;
+    val = clean(r && r.proposals && r.proposals[fkey]);
+  }
+  if(m === 'third') val = clean(state.thirdText[fkey]);
+  if(!val){ showToast('Nothing to lock in yet',''); render(); return; }
+  state.picks[fkey] = val;
+  const f = NEG_FIELDS.find(x=>x.key===fkey);
+  await saveMe('Pick saved — ' + (f ? f.short.toLowerCase() : 'done'));
+}
+
+function reopenField(fkey){
+  state.picks[fkey] = '';
+  state.pickMode[fkey] = '';
+  saveMe('Reopened — you can pick again');
+}
+
+function hydrateMe(){
+  const r = state.s2[state.name];
+  state.podium      = (r && Array.isArray(r.podium)) ? r.podium.slice(0, PODIUM_SIZE) : [];
+  state.punishWrite = (r && r.punishWrite) || '';
+  state.targetVote  = (r && r.targetVote) || '';
+  state.targetWrite = (r && r.targetWrite) || '';
+  state.proposals   = Object.assign({rname:'',bet:'',side:''}, (r && r.proposals) || {});
+  state.picks       = Object.assign({rname:'',bet:'',side:''}, (r && r.picks) || {});
+  state.thirdText   = { rname:'', bet:'', side:'' };
+  state.pickMode    = { rname:'', bet:'', side:'' };
+  // Work out which radio each saved pick corresponds to.
+  const rival = myRival(state.name);
+  const theirs = rival ? state.s2[rival] : null;
+  NEG_FIELDS.forEach(f => {
+    const mine = clean(state.proposals[f.key]);
+    const thr  = clean(theirs && theirs.proposals && theirs.proposals[f.key]);
+    const pick = clean(state.picks[f.key]);
+    if(!pick){ state.pickMode[f.key] = ''; return; }
+    if(mine && norm(pick) === norm(mine))      state.pickMode[f.key] = 'mine';
+    else if(thr && norm(pick) === norm(thr))   state.pickMode[f.key] = 'theirs';
+    else { state.pickMode[f.key] = 'third'; state.thirdText[f.key] = pick; }
+  });
+  state.dirty = false;
+  state.savedAt = (r && r.updatedAt) || null;
+}
+
+function myPayload(){
+  return {
+    __kind: 's2',
+    name: state.name,
+    podium: state.podium.slice(),
+    podiumText: state.podium.map(id => { const o = myBallotById(id); return o ? o.text : null; }).filter(Boolean),
+    punishWrite: clean(state.punishWrite),
+    targetVote: state.targetVote,
+    targetWrite: clean(state.targetWrite),
+    proposals: {
+      rname: clean(state.proposals.rname),
+      bet:   clean(state.proposals.bet),
+      side:  clean(state.proposals.side)
+    },
+    picks: {
+      rname: clean(state.picks.rname),
+      bet:   clean(state.picks.bet),
+      side:  clean(state.picks.side)
+    },
+    rival: myRival(state.name) || null,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function saveMe(message){
+  if(!state.name){ showToast('Pick your name first','bad'); return false; }
+  state.saving = true; render();
+  const payload = myPayload();
+  try{
+    await LeagueStore.set('s2:' + state.name, JSON.stringify(payload));
+    state.s2[state.name] = payload;      // optimistic local update
+    state.dirty = false;
+    state.savedAt = payload.updatedAt;
+    state.saving = false;
+    showToast(message || 'Saved', 'good');
+    render();
+    loadAll(true);                        // pick up anything the rival just did
+    return true;
+  }catch(e){
+    state.saving = false;
+    // Code.gs rejects writes to a survey that isn't open. That can land
+    // mid-session if the commissioner closes it while this page is open.
+    if(e && e.code === 'survey_closed'){
+      LeagueStatus.map[SURVEY_ID] = { status: e.status || 'closed' };
+      showToast('The commissioner just closed this survey — nothing more can be saved','bad');
+    } else {
+      showToast('Could not save — check your connection and try again','bad');
+    }
+    render();
+    return false;
+  }
+}
+
+function renderSaveBar(){
+  const cls = state.dirty ? '' : 'saved';
+  const txt = state.saving ? 'Saving…'
+            : state.dirty  ? 'You have unsaved changes'
+            : (state.savedAt ? 'All saved' : 'Nothing saved yet');
+  const sub = state.saving ? ''
+            : state.dirty  ? 'Your rival can’t see them until you save'
+            : (state.savedAt ? 'Last saved ' + esc(fmtDate(state.savedAt)) : 'Save to put your answers on the record');
+  return el(`
+    <div class="savebar ${cls}">
+      <div class="savebar-inner">
+        <div class="savebar-txt">${esc(txt)}<small>${sub}</small></div>
+        <button class="savebar-btn" ${state.saving?'disabled':''} onclick="saveFromBar()">${state.saving?'Saving…':'Save'}</button>
+      </div>
+    </div>`);
+}
+
+function saveFromBar(){ syncInputs(); saveMe('Saved — your rival can see it now'); }
+
+function syncInputs(){
+  document.querySelectorAll('[data-prop]').forEach(t=>{ state.proposals[t.getAttribute('data-prop')] = t.value; });
+  document.querySelectorAll('[data-third]').forEach(t=>{ state.thirdText[t.getAttribute('data-third')] = t.value; });
+  document.querySelectorAll('[data-force]').forEach(t=>{ state.forceDraft[t.getAttribute('data-force')] = t.value; });
+  const pw = document.getElementById('punWrite');   if(pw) state.punishWrite = pw.value;
+  const tw = document.getElementById('targetWrite'); if(tw) state.targetWrite = tw.value;
+}
+
+function wireInputs(){
+  const sel = document.getElementById('nameSelect');
+  if(sel) sel.onchange = (e)=>{
+    state.name = e.target.value;
+    state.animateNag = !!e.target.value;
+    hydrateMe();
+    render();
+    window.scrollTo({ top: 0, behavior:'smooth' });
+  };
+  document.querySelectorAll('[data-prop],[data-third],[data-force]').forEach(t=>{
+    t.oninput = ()=>{
+      if(t.hasAttribute('data-prop'))  { state.proposals[t.getAttribute('data-prop')] = t.value; state.dirty = true; }
+      if(t.hasAttribute('data-third')) { state.thirdText[t.getAttribute('data-third')] = t.value; state.dirty = true; }
+      if(t.hasAttribute('data-force')) { state.forceDraft[t.getAttribute('data-force')] = t.value; }
+      refreshChrome();
+    };
+  });
+  const pw = document.getElementById('punWrite');
+  if(pw) pw.oninput = ()=>{ state.punishWrite = pw.value; state.dirty = true; refreshChrome(); };
+  const tw = document.getElementById('targetWrite');
+  if(tw) tw.oninput = ()=>{ state.targetWrite = tw.value; state.dirty = true; refreshChrome(); };
+}
+
+function refreshChrome(){
+  const bar = document.querySelector('.savebar');
+  if(bar){
+    bar.classList.toggle('saved', !state.dirty);
+    const txt = bar.querySelector('.savebar-txt');
+    if(txt) txt.innerHTML = (state.dirty ? 'You have unsaved changes' : (state.savedAt ? 'All saved' : 'Nothing saved yet'))
+      + '<small>' + (state.dirty ? 'Your rival can’t see them until you save'
+        : (state.savedAt ? 'Last saved ' + escapeHtml(fmtDate(state.savedAt)) : 'Save to put your answers on the record')) + '</small>';
+  }
+  document.querySelectorAll('.neg-card[data-fkey]').forEach(card=>{
+    const key = card.getAttribute('data-fkey');
+    if(!key) return;
+
+    // Keep the "your proposal" radio showing what's actually in the textarea,
+    // so it's never one keystroke behind.
+    const opt = card.querySelector('[data-pickopt="'+key+':mine"]');
+    if(opt){
+      const v = clean(state.proposals[key]);
+      const val = opt.querySelector('.pick-val');
+      const txt = opt.querySelector('.pick-txt');
+      if(val) val.textContent = v || 'Type your proposal above and it appears here';
+      if(txt) txt.classList.toggle('muted', !v);
+    }
+
+    const btn = card.querySelector('.neg-btn:not(.undo)');
+    if(btn) btn.disabled = !pickReady(key);
+  });
+}
+</script>
+</body>
+</html>

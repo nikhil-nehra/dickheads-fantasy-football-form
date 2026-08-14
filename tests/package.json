@@ -1,0 +1,15 @@
+{
+  "name": "dickheads-league-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Playwright suites for the Dickhead's League site",
+  "scripts": {
+    "test": "node test-architecture.js && node test-rivalry.js",
+    "test:architecture": "node test-architecture.js",
+    "test:rivalry": "node test-rivalry.js",
+    "test:migration": "node test-migration.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.47.0"
+  }
+}
