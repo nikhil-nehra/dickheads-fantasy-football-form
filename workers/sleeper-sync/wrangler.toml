@@ -1,0 +1,34 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  SLEEPER SYNC — scheduled worker
+# ═══════════════════════════════════════════════════════════════════════════
+#  A separate worker, bound to the SAME D1 database as the app.
+#
+#  Why separate: @sveltejs/adapter-cloudflare emits a worker that exports only
+#  a `fetch` handler. Hosting a `scheduled` handler alongside it would mean
+#  forking the adapter or wrapping its build output. This is ~200 lines with
+#  no coupling to the app build at all, and deploys independently.
+#
+#  Deploy:  npm run deploy:sync
+# ═══════════════════════════════════════════════════════════════════════════
+
+name = "dickheads-sleeper-sync"
+main = "src/index.ts"
+compatibility_date = "2026-08-14"
+
+[triggers]
+# Every 10 minutes keeps game-day scores fresh without going anywhere near
+# Sleeper's guidance of staying under 1000 calls/minute — this is ~5 calls per
+# 10 minutes. The daily tick picks up the playoff brackets.
+crons = ["*/10 * * * *", "17 9 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dickheads-league"
+database_id = "370ea429-8f05-451e-860a-66a9843d1751"
+
+[vars]
+SEASON = "2026"
+SLEEPER_LEAGUE_ID = "1381366017682313216"
+
+[observability]
+enabled = true

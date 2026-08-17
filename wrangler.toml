@@ -1,0 +1,44 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  THE DICKHEAD'S LEAGUE — app worker
+# ═══════════════════════════════════════════════════════════════════════════
+#  Site AND API on one origin. That is what makes the write protection in
+#  src/hooks.server.ts possible at all: same-origin means Origin checks and
+#  SameSite cookies actually mean something.
+#
+#  The scheduled Sleeper sync is a SEPARATE worker (workers/sleeper-sync/)
+#  bound to this same D1 database, because the SvelteKit adapter only emits a
+#  `fetch` handler and cannot host a `scheduled` one.
+# ═══════════════════════════════════════════════════════════════════════════
+
+name = "dickheads-league"
+main = ".svelte-kit/cloudflare/_worker.js"
+compatibility_date = "2026-08-14"
+compatibility_flags = ["nodejs_als"]
+
+[assets]
+binding = "ASSETS"
+directory = ".svelte-kit/cloudflare"
+
+[observability]
+enabled = true
+
+# ── Database ────────────────────────────────────────────────────────────────
+# Create with:  wrangler d1 create dickheads-league
+# then paste the returned id below (it is not a secret).
+[[d1_databases]]
+binding = "DB"
+database_name = "dickheads-league"
+database_id = "370ea429-8f05-451e-860a-66a9843d1751"
+migrations_dir = "db/migrations"
+
+# ── Public config ───────────────────────────────────────────────────────────
+[vars]
+SEASON = "2026"
+# Your Sleeper league id for the season above. Read-only, not a secret.
+SLEEPER_LEAGUE_ID = "1381366017682313216"
+
+# ── Secrets (NEVER in this file) ────────────────────────────────────────────
+# wrangler secret put COMMISH_PIN
+#
+# The old PIN 7531 is burned — it is in the public repo, in the README, and
+# permanent in git history. Use a new value here. It never reaches the browser.

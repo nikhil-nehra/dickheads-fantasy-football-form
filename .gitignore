@@ -1,0 +1,18 @@
+node_modules/
+.svelte-kit/
+.wrangler/
+build/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+test-results/
+playwright-report/
+
+# Local dev secrets (COMMISH_PIN). Never committed.
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler-e2e/
