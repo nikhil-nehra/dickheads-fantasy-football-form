@@ -15,6 +15,28 @@ main = ".svelte-kit/cloudflare/_worker.js"
 compatibility_date = "2026-08-14"
 compatibility_flags = ["nodejs_als"]
 
+# ── Custom domain ───────────────────────────────────────────────────────────
+# Must stay ABOVE the first [table] header: TOML would otherwise read this as
+# a field of that table, and wrangler warns "Unexpected fields found in assets
+# field: routes" and silently deploys without it.
+#
+# `custom_domain = true` makes wrangler create the DNS record and manage the
+# certificate on deploy, so this is the whole configuration — nothing to click.
+# The zone must already be in the same Cloudflare account.
+#
+# Nothing in the app hardcodes an origin (og:image is built from the request
+# URL), so the site serves correctly here and on workers.dev.
+routes = [
+  { pattern = "thedickheadsfootballleague.com", custom_domain = true },
+  { pattern = "www.thedickheadsfootballleague.com", custom_domain = true }
+]
+
+# Declaring `routes` turns the workers.dev URL OFF by default, which takes the
+# site down for the minutes a new domain spends provisioning its certificate.
+# Kept on as a fallback. Set to false once the domain has been stable a while
+# and you want a single canonical address.
+workers_dev = true
+
 [assets]
 binding = "ASSETS"
 directory = ".svelte-kit/cloudflare"
