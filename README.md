@@ -17,13 +17,14 @@ you close things down without ever breaking a link you've already shared.
 
 | | |
 |---|---|
-| **The site** | **https://dickheads-league.dickheads-league.workers.dev** |
+| **The site** | **https://thedickheadsfootballleague.com** |
 | The boards | `…/b/rivalry` · `…/b/draft` · `…/b/pot` · `…/b/standings` |
 | Commissioner's Desk | `…/desk` |
 | Your copy, while working on it | `npm run dev` → **http://localhost:5173** |
 
 Server-rendered SvelteKit on Cloudflare Workers + D1, with the site and the API
-on one origin. There is no GitHub Pages site — the old `nikhil-nehra.github.io`
+on one origin. `dickheads-league.dickheads-league.workers.dev` still resolves as
+a fallback. There is no GitHub Pages site — the old `nikhil-nehra.github.io`
 address is retired. The commissioner PIN is a Worker secret: never in this
 repo, never in the browser.
 
