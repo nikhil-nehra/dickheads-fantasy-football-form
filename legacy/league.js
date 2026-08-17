@@ -24,7 +24,7 @@
 var API_URL = 'https://script.google.com/macros/s/AKfycbzbz62iEh5NBOVqsqsoa1ZfNIK3sHKOvf9FBfVsizvD05M-vfLz_Pqep6pLhYanVVIF/exec';
 
 /* Must match COMMISH_PIN in Code.gs. Soft lock — see README "Cautions". */
-var COMMISH_PIN = '7531';
+var COMMISH_PIN = 'REDACTED';
 
 
 /* ═════════════════════════════════════════════════════════════

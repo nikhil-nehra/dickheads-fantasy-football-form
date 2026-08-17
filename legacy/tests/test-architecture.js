@@ -70,7 +70,7 @@ function seed() {
   check('s2force: writes rejected without the PIN',
     backend.doPost({ key: 's2force:A::B', value: '{}' }).error === 'forbidden');
   check('meta: writes accepted with the PIN',
-    backend.doPost({ key: 'meta:status', value: '{"intake":{"status":"open"}}', pin: '7531' }).ok === true);
+    backend.doPost({ key: 'meta:status', value: '{"intake":{"status":"open"}}', pin: 'REDACTED' }).ok === true);
 
   // ═══ 2. HUB ═══
   console.log('\n[2] The hub');
@@ -107,7 +107,7 @@ function seed() {
     JSON.stringify(rejected));
   check('rejection names the survey and status', rejected.survey === 'intake' && rejected.status === 'closed');
   check('the commissioner can still write with the PIN',
-    backend.doPost({ key: 'response:David Moton', value: '{"name":"David Moton","buyIn":"$50","beefOrder":[]}', pin: '7531' }).ok === true);
+    backend.doPost({ key: 'response:David Moton', value: '{"name":"David Moton","buyIn":"$50","beefOrder":[]}', pin: 'REDACTED' }).ok === true);
   check('the OTHER survey is unaffected',
     backend.doPost({ key: 's2:Nikhil Nehra', value: '{"__kind":"s2","name":"Nikhil Nehra","podium":[],"picks":{},"proposals":{}}' }).ok === true);
 

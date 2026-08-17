@@ -32,7 +32,7 @@ var SHEET_NAME = 'responses';
 
 /* Must match COMMISH_PIN in league.js. Used to authorise commissioner-only
    writes: changing a survey's status, and overriding a closed survey. */
-var COMMISH_PIN = '7531';
+var COMMISH_PIN = 'REDACTED';
 
 /* Which survey each key namespace belongs to. Used to decide whether a write
    is allowed given that survey's current status. Anything not listed here is
