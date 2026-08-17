@@ -291,10 +291,11 @@ Two things that will bite you:
   blank PIN must never be an unlocked door. The Cloudflare dashboard
   (Workers → dickheads-league → Settings → Variables and Secrets) works too.
 
-Pick a **new** PIN. The old one (`7531`) is burned: it is still sitting in
-`legacy/league.js`, `legacy/Code.gs` and the git history of this public repo.
-This one never reaches the browser, and the server compares it in constant
-time behind a rate limit.
+Pick a **new** PIN. The 2025 one is burned — it shipped to every browser in
+the old `league.js`. It has been redacted from `legacy/`, but it is permanent
+in this public repo's git history, so it can never be used again. The new one
+never reaches the browser, and the server compares it in constant time behind
+a rate limit.
 
 ### 3. Point it at your Sleeper league
 
