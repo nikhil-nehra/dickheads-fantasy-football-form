@@ -13,17 +13,96 @@ you close things down without ever breaking a link you've already shared.
 
 ---
 
-## Quick reference
+## Where it lives
 
-| Thing | Value |
+| | |
 |---|---|
-| Runs on | Cloudflare Workers + D1, one origin for site and API |
-| Framework | SvelteKit 2 / Svelte 5, server-rendered |
-| Commissioner PIN | a Worker secret — never in this repo, never in the browser |
-| Add a player | a row in `player`, or let the Sleeper sync link them |
-| Add a survey | one file in `src/lib/surveys/` |
-| Open & close surveys | Commissioner's Desk → League Control |
-| The link to paste in Sleeper | `…/b/rivalry` |
+| **The site** | **https://dickheads-league.dickheads-league.workers.dev** |
+| The boards | `…/b/rivalry` · `…/b/draft` · `…/b/pot` · `…/b/standings` |
+| Commissioner's Desk | `…/desk` |
+| Your copy, while working on it | `npm run dev` → **http://localhost:5173** |
+
+Server-rendered SvelteKit on Cloudflare Workers + D1, with the site and the API
+on one origin. There is no GitHub Pages site — the old `nikhil-nehra.github.io`
+address is retired. The commissioner PIN is a Worker secret: never in this
+repo, never in the browser.
+
+`…/b/rivalry` is the link to paste in Sleeper.
+
+---
+
+## How things get changed
+
+Most of what you'll want to change day to day needs no code at all.
+
+| To change | Do this | Takes effect |
+|---|---|---|
+| Open / close / archive a survey | Desk → **League Control** | instantly |
+| Who's paired with who | Desk → **Rivalries** | instantly |
+| Settle a stuck rivalry line | Desk → **Rivalries** → Rule | instantly |
+| Link a player to a Sleeper account | Desk → **Sleeper** | instantly |
+| Standings, scores, playoff brackets | nothing — the cron syncs every 10 min | automatic |
+| Questions, copy, boards, styling | edit the code, push to `main` | ~2 min via CI |
+| Add a player | a row in the `player` table | next page load |
+
+Anything in the top group is stored in the database, which is the whole point:
+you can run the league from your phone without touching git.
+
+### Changing the code
+
+```bash
+npm run dev      # http://localhost:5173, with a real local database
+npm run check    # typecheck
+npm test         # 86 unit tests, ~1s
+npm run test:e2e # 36 end-to-end tests against the real production bundle
+```
+
+Then commit and **push to `main`**. GitHub Actions typechecks, runs both
+suites, builds, applies any new migrations and deploys both Workers. If the
+tests fail, nothing deploys.
+
+`npm run dev` runs inside workerd via the Cloudflare Vite plugin, so
+`platform.env.DB` in development is a real local D1 database — the same code
+path as production, not a stub. First time on a new machine:
+
+```bash
+npm install
+npm run db:apply:local && npm run db:seed:local && npm run db:link:local
+cp .dev.vars.example .dev.vars     # a throwaway local COMMISH_PIN
+```
+
+Your local database is entirely separate from the live one. Nothing you do in
+dev can touch real answers.
+
+### Changing the database shape
+
+Add a numbered file to `db/migrations/`. Never edit one that has already run —
+CI applies pending migrations on deploy, and an edited file is not pending.
+
+### Deploy credentials
+
+Two repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Where it comes from |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → **Edit Cloudflare Workers** template, plus **D1 : Edit** |
+| `CLOUDFLARE_ACCOUNT_ID` | `npx wrangler whoami` |
+
+Without them the deploy job skips cleanly rather than failing, so CI is still
+useful before you set them up. Deploying by hand is `npm run deploy` and
+`npm run deploy:sync`.
+
+`COMMISH_PIN` is deliberately **not** a GitHub secret. It lives only in
+Cloudflare (`wrangler secret put COMMISH_PIN`, or the dashboard under Settings
+→ Variables and Secrets) and is never needed to build. Changing it signs
+every open Desk session out, because the session cookie is signed with it.
+
+### Other bits
+
+```bash
+node scripts/make-og.mjs   # regenerate the link-preview image and icon
+npm run import:sheet       # one-off: convert the old Google Sheet export
+```
 
 ---
 
@@ -181,7 +260,9 @@ joined the league yet.
 
 ---
 
-## Setup
+## Setting up a fresh copy
+
+Already done for the live deployment — this is only for standing up a new one.
 
 ### 1. Create the database
 
@@ -199,10 +280,21 @@ Paste the returned `database_id` into **both** `wrangler.toml` and
 npx wrangler secret put COMMISH_PIN
 ```
 
-Pick a **new** PIN. The old one (`7531`) is burned: it was published in the old
-README, shipped to every browser in `league.js`, and is permanent in git
-history. This one is a Worker secret — it never reaches the browser, and the
-server compares it in constant time behind a rate limit.
+Two things that will bite you:
+
+- **The argument is the secret's NAME, not its value.** The value is typed at
+  the prompt afterwards. `wrangler secret put 1234` creates a secret *called*
+  `1234` and the Desk stays locked.
+- **It needs a real terminal.** Run it from PowerShell or Windows Terminal
+  directly. Piped through anything without an interactive prompt it stores an
+  empty string, and the Desk reports `503 not_configured` — correctly, since a
+  blank PIN must never be an unlocked door. The Cloudflare dashboard
+  (Workers → dickheads-league → Settings → Variables and Secrets) works too.
+
+Pick a **new** PIN. The old one (`7531`) is burned: it is still sitting in
+`legacy/league.js`, `legacy/Code.gs` and the git history of this public repo.
+This one never reaches the browser, and the server compares it in constant
+time behind a rate limit.
 
 ### 3. Point it at your Sleeper league
 
@@ -233,56 +325,7 @@ npm run deploy        # the app
 npm run deploy:sync   # the cron worker
 ```
 
-Or just push to `main` — see below.
-
-**Live:** https://dickheads-league.dickheads-league.workers.dev
-
----
-
-## Local development
-
-```bash
-npm run db:apply:local
-npm run db:seed:local
-cp .dev.vars.example .dev.vars     # sets a local COMMISH_PIN
-npm run dev
-```
-
-`npm run dev` runs inside workerd via the Cloudflare Vite plugin, so
-`platform.env.DB` in development is a real local D1 database — the same code
-path as production, not a stub.
-
-```bash
-npm run check     # typecheck (0 errors, 0 warnings)
-npm test          # 86 unit tests, ~1s
-npm run test:e2e  # 36 end-to-end tests against the real production bundle
-npm run test:all  # both
-npm run build
-node scripts/make-og.mjs   # regenerate the link-preview image and icon
-```
-
----
-
-## Deploying
-
-Push to `main` and GitHub Actions typechecks, runs both test suites, builds,
-applies any new migrations, and deploys both Workers. Nothing else to do.
-
-It needs two repository secrets (Settings → Secrets and variables → Actions):
-
-| Secret | Where it comes from |
-|---|---|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard → My Profile → API Tokens → **Edit Cloudflare Workers** template, plus **D1 : Edit** |
-| `CLOUDFLARE_ACCOUNT_ID` | `npx wrangler whoami` |
-
-Without them the deploy job skips cleanly rather than failing, so CI is still
-useful before you set them up.
-
-`COMMISH_PIN` is deliberately **not** a GitHub secret. It lives only in
-Cloudflare (`wrangler secret put COMMISH_PIN`) and is never needed to build.
-
-There is no GitHub Pages site. The old `nikhil-nehra.github.io` URLs are
-retired.
+Or just push to `main` — see **How things get changed**.
 
 ---
 
