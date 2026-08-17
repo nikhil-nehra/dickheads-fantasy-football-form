@@ -17,6 +17,9 @@
 		"db:link:local": "wrangler d1 execute dickheads-league --local --file=db/link-sleeper.sql",
 		"db:seed:remote": "wrangler d1 execute dickheads-league --remote --file=db/seed.sql",
 		"db:link:remote": "wrangler d1 execute dickheads-league --remote --file=db/link-sleeper.sql",
+		"import:sheet": "vite-node scripts/import-sheet.ts",
+		"db:import:local": "wrangler d1 execute dickheads-league --local --file=context/import-intake.sql",
+		"db:import:remote": "wrangler d1 execute dickheads-league --remote --file=context/import-intake.sql",
 		"deploy": "npm run build && wrangler deploy",
 		"deploy:sync": "wrangler deploy --config workers/sleeper-sync/wrangler.toml",
 		"test:e2e": "vitest run --config vitest.e2e.config.ts",
@@ -33,6 +36,7 @@
 		"svelte-check": "^4.7.6",
 		"typescript": "^6.0.3",
 		"vite": "^8.2.1",
+		"vite-node": "^6.0.0",
 		"vitest": "^4.1.10",
 		"wrangler": "^4.123.0"
 	},
