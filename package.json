@@ -5,10 +5,11 @@
 	"type": "module",
 	"description": "The Dickhead's Fantasy Football League \u00e2\u20ac\u201d surveys, boards and a commissioner's desk on Cloudflare Workers + D1",
 	"scripts": {
+		"prepare": "svelte-kit sync || echo ''",
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "npm run build && wrangler dev",
-		"check": "svelte-check --tsconfig ./tsconfig.json",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"test": "vitest run --config vitest.config.ts",
 		"test:watch": "vitest",
 		"db:apply:local": "wrangler d1 migrations apply dickheads-league --local",
