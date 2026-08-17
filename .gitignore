@@ -16,3 +16,6 @@ playwright-report/
 .dev.vars.*
 !.dev.vars.example
 .wrangler-e2e/
+
+# Exports of league members' answers. Personal data, public repo — never commit.
+*responses*.csv
