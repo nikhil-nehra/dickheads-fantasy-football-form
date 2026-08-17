@@ -55,10 +55,9 @@ db/
   migrations/         the schema
   seed.sql            the roster
 workers/sleeper-sync/ the cron worker
-docs/                 redirect stubs for the old GitHub Pages URLs
 legacy/               the previous implementation, kept for reference
-tests/unit/           84 tests over the pure logic
-tests/e2e/            31 tests over the real bundle, on a throwaway D1
+tests/unit/           86 tests over the pure logic
+tests/e2e/            36 tests over the real bundle, on a throwaway D1
 ```
 
 ---
@@ -234,8 +233,9 @@ npm run deploy        # the app
 npm run deploy:sync   # the cron worker
 ```
 
-Then set `NEW_ORIGIN` in `docs/_redirect.js` to the deployed URL, and point
-GitHub Pages at **main / docs** so the old links keep working.
+Or just push to `main` — see below.
+
+**Live:** https://dickheads-league.dickheads-league.workers.dev
 
 ---
 
@@ -254,8 +254,8 @@ path as production, not a stub.
 
 ```bash
 npm run check     # typecheck (0 errors, 0 warnings)
-npm test          # 84 unit tests, ~1s
-npm run test:e2e  # 31 end-to-end tests against the real production bundle
+npm test          # 86 unit tests, ~1s
+npm run test:e2e  # 36 end-to-end tests against the real production bundle
 npm run test:all  # both
 npm run build
 node scripts/make-og.mjs   # regenerate the link-preview image and icon
@@ -263,21 +263,26 @@ node scripts/make-og.mjs   # regenerate the link-preview image and icon
 
 ---
 
-## Old links
+## Deploying
 
-Every URL the league already has keeps working. `docs/` holds redirect stubs
-served by GitHub Pages at the old address, and they forward to the new site.
+Push to `main` and GitHub Actions typechecks, runs both test suites, builds,
+applies any new migrations, and deploys both Workers. Nothing else to do.
 
-They are a script rather than a `<meta refresh>` for one specific reason: the
-boards were deep-linked by **hash** (`…/boards.html#rivalry`), the hash is never
-sent to a server, and a meta refresh drops it. `tests/unit/redirects.test.ts`
-runs the actual shipped file against a stubbed browser and asserts every old
-path — including each board hash — lands in the right place.
+It needs two repository secrets (Settings → Secrets and variables → Actions):
 
-The old root served Survey 1 directly. It now lands on the hub, which lists
-intake with its live status: one extra tap, but the link still makes sense
-after the survey closes instead of dead-ending on a locked form. That also
-removes the need for the "September swap" the old README planned.
+| Secret | Where it comes from |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard → My Profile → API Tokens → **Edit Cloudflare Workers** template, plus **D1 : Edit** |
+| `CLOUDFLARE_ACCOUNT_ID` | `npx wrangler whoami` |
+
+Without them the deploy job skips cleanly rather than failing, so CI is still
+useful before you set them up.
+
+`COMMISH_PIN` is deliberately **not** a GitHub secret. It lives only in
+Cloudflare (`wrangler secret put COMMISH_PIN`) and is never needed to build.
+
+There is no GitHub Pages site. The old `nikhil-nehra.github.io` URLs are
+retired.
 
 ---
 
@@ -328,6 +333,6 @@ actually broken:
 | Both required ranking steps were pointer-only, and the PIN pad had no keyboard path — Survey 1 could not be completed without a mouse | real buttons, arrow-key reordering, live announcements, typable PIN |
 | No OG tags, so every board link pasted into Sleeper unfurled as a bare URL | per-board title, description and image |
 | Every request re-scanned the whole sheet, 2–3× | indexed SQL |
-| No tests in CI, no CI | 84 unit + 31 end-to-end tests, typecheck and build on every push |
+| No tests in CI, no CI | 86 unit + 36 end-to-end tests, typecheck and build on every push |
 | No audit trail | `audit_log` |
 | No dark mode, two never-merged 480px breakpoints, nothing above 640px | token-based theming, dark mode, a real desktop layout |
