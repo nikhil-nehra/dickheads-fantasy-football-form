@@ -31,7 +31,7 @@ function redirectFor(pathname: string, hash = '', search = ''): string {
 	return replaced;
 }
 
-const BASE = 'https://dickheads-league.workers.dev';
+const BASE = 'https://dickheads-league.dickheads-league.workers.dev';
 const OLD = '/dickheads-fantasy-football-form/';
 
 describe('legacy link preservation', () => {

@@ -18,7 +18,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 (function () {
-	var NEW_ORIGIN = 'https://dickheads-league.workers.dev';
+	var NEW_ORIGIN = 'https://dickheads-league.dickheads-league.workers.dev';
 
 	// Old page  →  new path. Board hashes are appended by the map below.
 	//
