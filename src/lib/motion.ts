@@ -4,17 +4,22 @@ import type { Action } from 'svelte/action';
    MOTION
    ═══════════════════════════════════════════════════════════════════════════
    Every animation on the site that needs JavaScript lives here. No library —
-   Svelte's own transitions plus these four actions cover it, and the Worker
+   Svelte's own transitions plus these three helpers cover it, and the Worker
    bundle stays the size it was.
 
-   Two rules hold everywhere in this file:
+   Three rules hold everywhere in this file:
 
-   1. Nothing here may hide content. Actions run on the client only, so a
-      reveal that started life hidden in CSS would stay hidden forever for a
-      reader without JavaScript. Instead the action marks the element as
-      pending itself, at runtime, and CSS only hides what has been marked.
+   1. Nothing here may hide content. Actions run on the client only, so
+      anything that started life hidden in CSS would stay hidden forever for a
+      reader without JavaScript.
 
-   2. `prefers-reduced-motion` is honoured in JS as well as CSS. The CSS media
+   2. Nothing animates because the reader scrolled. There was a fade-and-rise
+      reveal on cards and sections; it made the page feel like it was still
+      loading every time you moved down it, and it is gone. Motion is a
+      response to an action — a save, a ruling, a wrong PIN — or it does not
+      happen.
+
+   3. `prefers-reduced-motion` is honoured in JS as well as CSS. The CSS media
       query can flatten a transition, but it cannot stop a requestAnimationFrame
       loop from repainting a number sixty times a second — so the loops check.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -28,47 +33,6 @@ export function reduced(): boolean {
 	);
 }
 
-/* ── Scroll reveal ─────────────────────────────────────────────────────── */
-
-export type RevealParams = {
-	/** Explicit delay in ms. Wins over `index`. */
-	delay?: number;
-	/** Position in a list; multiplied by `step` to stagger a group. */
-	index?: number;
-	/** Per-item stagger, default 60ms. */
-	step?: number;
-} | undefined;
-
-/**
- * Fade-and-rise an element the first time it scrolls into view.
- *
- * The element is only marked hidden once this runs, which is after hydration —
- * so the server-rendered page is always readable on its own.
- */
-export const reveal: Action<HTMLElement, RevealParams> = (node, params) => {
-	if (reduced() || typeof IntersectionObserver === 'undefined') return {};
-
-	const delay = params?.delay ?? (params?.index ?? 0) * (params?.step ?? 60);
-	node.style.setProperty('--reveal-delay', `${delay}ms`);
-	node.dataset.reveal = 'pending';
-
-	const io = new IntersectionObserver(
-		(entries) => {
-			for (const entry of entries) {
-				if (!entry.isIntersecting) continue;
-				node.dataset.reveal = 'in';
-				io.disconnect();
-			}
-		},
-		// Fire a little before the element is fully on screen, so the animation
-		// is finishing as it arrives rather than starting.
-		{ rootMargin: '0px 0px -6% 0px', threshold: 0.04 }
-	);
-
-	io.observe(node);
-	return { destroy: () => io.disconnect() };
-};
-
 /* ── Count-up numerals ─────────────────────────────────────────────────── */
 
 export type CountParams = {
@@ -81,8 +45,13 @@ export type CountParams = {
 const plain = (n: number): string => Math.round(n).toLocaleString();
 
 /**
- * Roll a number up from zero when the tile first appears, and tween between
- * values on every change after that.
+ * Roll a number up from zero on mount, and tween between values on every
+ * change after that.
+ *
+ * Deliberately NOT triggered by scrolling into view. Nothing on this site
+ * animates because you scrolled past it — a stat that is already on screen
+ * when the page loads counts up, and one further down is simply correct by the
+ * time you reach it.
  *
  * The server renders the true value into the element, so this is decoration on
  * top of correct content — never the only thing that puts a number on screen.
@@ -91,7 +60,6 @@ export const countUp: Action<HTMLElement, CountParams> = (node, params) => {
 	let p = params;
 	let raf = 0;
 	let shown = p.value;
-	let started = false;
 
 	/* Write through the text node Svelte already owns rather than replacing it.
 	   `node.textContent = …` detaches that node, and the next reactive update
@@ -127,40 +95,13 @@ export const countUp: Action<HTMLElement, CountParams> = (node, params) => {
 		raf = requestAnimationFrame(tick);
 	}
 
-	if (reduced() || typeof IntersectionObserver === 'undefined') {
-		started = true;
-	} else {
-		const io = new IntersectionObserver(
-			(entries) => {
-				for (const entry of entries) {
-					if (!entry.isIntersecting || started) continue;
-					started = true;
-					run(0, p.value);
-					io.disconnect();
-				}
-			},
-			{ threshold: 0.2 }
-		);
-		io.observe(node);
-
-		return {
-			update(next: CountParams) {
-				const changed = next.value !== p.value;
-				p = next;
-				if (started && changed) run(shown, next.value);
-				else if (!started) shown = next.value;
-			},
-			destroy() {
-				cancelAnimationFrame(raf);
-				io.disconnect();
-			}
-		};
-	}
+	run(0, p.value);
 
 	return {
 		update(next: CountParams) {
+			const changed = next.value !== p.value;
 			p = next;
-			paint(next.value);
+			if (changed) run(shown, next.value);
 		},
 		destroy() {
 			cancelAnimationFrame(raf);

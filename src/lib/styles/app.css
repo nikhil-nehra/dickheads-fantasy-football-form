@@ -105,7 +105,7 @@
 	/* ── MOTION ──────────────────────────────────────────────────────────── */
 	--dur-1: 120ms; /* state flips: press, hover, check */
 	--dur-2: 220ms; /* element enter/exit */
-	--dur-3: 420ms; /* reveals, meters */
+	--dur-3: 420ms; /* meters, notices */
 	--dur-4: 700ms; /* count-ups, the stamp */
 	/* The easing the original used for its one good animation, kept as the
 	   house curve: fast out of the gate, settles without bouncing. */
@@ -249,6 +249,12 @@ img {
    desktop monitor. Boards and the desk get room to breathe instead. */
 .shell--wide {
 	max-width: 1100px;
+}
+
+/* The hub, wide enough to lay its tiles out two and three across rather than
+   stacking every one of them down a single column. */
+.shell--hub {
+	max-width: 920px;
 }
 
 .card {
@@ -454,13 +460,6 @@ img {
 	width: clamp(56px, 14vw, 84px);
 	height: auto;
 	filter: drop-shadow(0 3px 8px rgb(0 0 0 / 50%));
-}
-
-/* The hub gets a bigger one, centred, as the page's opening statement. */
-.crest--hero {
-	display: block;
-	width: clamp(120px, 34vw, 168px);
-	margin: 0 auto var(--s-3);
 }
 
 .banner h1 {
@@ -1022,17 +1021,9 @@ legend {
 
 /* ── Motion utilities ──────────────────────────────────────────────────── */
 
-/* Scroll reveal. The attribute is written by the `reveal` action at runtime,
-   never by the server — so with JavaScript off nothing is ever hidden. */
-[data-reveal='pending'] {
-	opacity: 0;
-	transform: translateY(14px);
-}
-
-[data-reveal='in'] {
-	animation: rise var(--dur-3) var(--ease-out) both;
-	animation-delay: var(--reveal-delay, 0ms);
-}
+/* There is deliberately no scroll-reveal here. Cards and sections used to
+   fade-and-rise as they came into view; it made the page feel like it was
+   still loading every time you scrolled. Content is now simply present. */
 
 .pop {
 	animation: pop var(--dur-2) var(--ease) both;
@@ -1068,18 +1059,6 @@ legend {
 }
 
 /* ── Keyframes ─────────────────────────────────────────────────────────── */
-
-@keyframes rise {
-	from {
-		opacity: 0;
-		transform: translateY(14px);
-	}
-
-	to {
-		opacity: 1;
-		transform: none;
-	}
-}
 
 @keyframes nag {
 	from {
@@ -1297,9 +1276,7 @@ legend {
 
 /* ── Reduced motion ────────────────────────────────────────────────────── */
 
-/* Last in the file so it beats every animation declared above. Reveals must
-   also be *shown*, not merely un-animated — otherwise the opt-out hides the
-   page. */
+/* Last in the file so it beats every animation declared above. */
 @media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,
@@ -1308,10 +1285,5 @@ legend {
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
-	}
-
-	[data-reveal='pending'] {
-		opacity: 1;
-		transform: none;
 	}
 }

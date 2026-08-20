@@ -5,7 +5,7 @@
 	import SurveyTally from '$lib/components/SurveyTally.svelte';
 	import { allQuestions } from '$lib/surveys/types';
 	import { singleTally, allocationAverage } from '$lib/tally';
-	import { reveal, countUp, flash } from '$lib/motion';
+	import { countUp, flash } from '$lib/motion';
 	import { EMPTY, roast, lastPlaceNote } from '$lib/voice';
 	import Icon from '$lib/components/Icon.svelte';
 
@@ -149,7 +149,7 @@
 
 		{#if data.kind === 'rivalry'}
 			{#if data.verdict?.punishment}
-				<div class="verdict" use:reveal>
+				<div class="verdict">
 					<div class="down-tag red"><Icon name="flag" size={13} /> The punishment</div>
 					<p class="verdict-text display">{data.verdict.punishment}</p>
 					{#if data.verdict.targetLabel}
@@ -166,21 +166,21 @@
 
 			{#if rivalrySummary}
 				<div class="kv-grid">
-					<div class="kv" use:reveal={{ index: 0 }}>
+					<div class="kv">
 						<span class="kv-i"><Icon name="helmet" size={17} /></span>
 						<span class="kv-v nums" use:countUp={{ value: rivalrySummary.pairs }}
 							>{rivalrySummary.pairs}</span
 						>
 						<span class="kv-k">rivalries</span>
 					</div>
-					<div class="kv" use:reveal={{ index: 1 }}>
+					<div class="kv">
 						<span class="kv-i"><Icon name="signal" size={17} /></span>
 						<span class="kv-v nums" use:countUp={{ value: rivalrySummary.settled }}
 							>{rivalrySummary.settled}</span
 						>
 						<span class="kv-k">lines agreed</span>
 					</div>
-					<div class="kv" use:reveal={{ index: 2 }}>
+					<div class="kv">
 						<span class="kv-i"><Icon name="flag" size={17} /></span>
 						<span
 							class="kv-v nums danger"
@@ -197,8 +197,8 @@
 			{/if}
 
 			<div class="pairs">
-				{#each data.pairings as p, i (p.id)}
-					<article class="pair" use:reveal={{ index: i, step: 50 }}>
+				{#each data.pairings as p (p.id)}
+					<article class="pair">
 						<header class="pair-head">
 							<span class="vs-name">{p.aName}</span>
 							<span class="vs-mid" aria-hidden="true">VS</span>
@@ -263,21 +263,21 @@
 			{/if}
 		{:else if data.board.id === 'pot' && pot}
 			<div class="kv-grid">
-				<div class="kv" use:reveal={{ index: 0 }}>
+				<div class="kv">
 					<span class="kv-i"><Icon name="clipboard" size={17} /></span>
 					<span class="kv-v sm">{pot.winner.label}</span>
 					<!-- .kv-k uppercases in CSS, so these labels stay lower case in the
 					     source — which is also what the end-to-end tests read. -->
 					<span class="kv-k">winning buy-in</span>
 				</div>
-				<div class="kv" use:reveal={{ index: 1 }}>
+				<div class="kv">
 					<span class="kv-i"><Icon name="trophy" size={17} /></span>
 					<span class="kv-v nums gold" use:countUp={{ value: pot.projected, format: dollars }}
 						>{dollars(pot.projected)}</span
 					>
 					<span class="kv-k">pot if everyone's in</span>
 				</div>
-				<div class="kv" use:reveal={{ index: 2 }}>
+				<div class="kv">
 					<span class="kv-i"><Icon name="football" size={17} /></span>
 					<span class="kv-v nums" use:countUp={{ value: pot.collected, format: dollars }}
 						>{dollars(pot.collected)}</span
@@ -287,8 +287,8 @@
 			</div>
 
 			<h3 class="rail">The vote</h3>
-			{#each pot.rows as r, i (r.id)}
-				<div class="bar" use:reveal={{ index: i, step: 40 }}>
+			{#each pot.rows as r (r.id)}
+				<div class="bar">
 					<span>{r.label}</span>
 					<div class="meter meter--live"><i style="width:{r.pct}%"></i></div>
 					<span class="faint nums">{r.n} votes</span>
@@ -297,15 +297,15 @@
 
 			{#if pot.split && pot.split.respondents}
 				<h3 class="rail">The split</h3>
-				{#each pot.split.buckets as b, i}
-					<div class="bar" use:reveal={{ index: i, step: 40 }}>
+				{#each pot.split.buckets as b (b.label)}
+					<div class="bar">
 						<span>{b.label}</span>
 						<div class="meter"><i style="width:{b.pct}%"></i></div>
 						<span class="faint nums">{b.pct}% · {money(b.pct, pot.projected)}</span>
 					</div>
 				{/each}
 				{#if pot.split.carveOut}
-					<div class="bar" use:reveal>
+					<div class="bar">
 						<span>{pot.split.carveOut.label}</span>
 						<div class="meter"><i style="width:{pot.split.carveOut.pct}%"></i></div>
 						<span class="faint nums"

@@ -8,7 +8,6 @@
 	import NegotiationSection from './NegotiationSection.svelte';
 	import { isVisible, type Question, type SurveyDefinition } from '$lib/surveys/types';
 	import { validateResponse } from '$lib/surveys/validate';
-	import { reveal } from '$lib/motion';
 	import { ERRORS, heckle } from '$lib/voice';
 	import type { BallotOption } from './types';
 
@@ -166,10 +165,10 @@
 		</p>
 	{/if}
 
-	{#each def.sections as section, i (section.id)}
+	{#each def.sections as section (section.id)}
 		{@const shown = section.questions.filter(visible)}
 		{#if shown.length}
-			<div class="section" use:reveal={{ index: i, step: 40 }}>
+			<div class="section">
 				<!-- The chain gang: the marker moves up as each section arrives. -->
 				<div class="down-tag">
 					<Icon name="marker" size={13} class="icon--advance" />

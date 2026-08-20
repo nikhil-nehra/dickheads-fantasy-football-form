@@ -2,7 +2,7 @@
 	import { slide, fly } from 'svelte/transition';
 	import { STATUS_META } from '$lib/status';
 	import type { SurveyStatus } from '$lib/server/db';
-	import { reveal, countUp, onKonami } from '$lib/motion';
+	import { countUp, onKonami } from '$lib/motion';
 	import { EMPTY } from '$lib/voice';
 	import Icon from '$lib/components/Icon.svelte';
 
@@ -39,60 +39,55 @@
 	/>
 </svelte:head>
 
-<div class="shell">
-	<section class="card">
-		<!-- The crest at full size, once, as the page's opening statement. It is
-		     decorative here: the banner above already names the league. -->
-		<img class="crest--hero" src="/logo-256.png" alt="" width="256" height="256" />
-		<div class="down-tag"><Icon name="clipboard" size={13} /> League business</div>
-		<h2 class="display headline">Anything marked open still needs you</h2>
-		<p class="q-help">
-			Closed surveys stay readable — you can always go back and see what you put. The results move
-			to the boards and stay there permanently, which is a threat.
-		</p>
+<div class="shell shell--hub">
+	<!-- No crest here. The banner directly above this carries the same badge;
+	     a second copy cost 170px of scroll to say nothing new. -->
+	<section class="card intro">
+		<div class="intro-text">
+			<div class="down-tag"><Icon name="clipboard" size={13} /> League business</div>
+			<h2 class="display headline">Anything marked open still needs you</h2>
+			<p class="q-help">Closed surveys stay readable. The boards are permanent, which is a threat.</p>
+		</div>
 
-		<div class="kv-grid">
-			<div class="kv" use:reveal={{ index: 0 }}>
-				<span class="kv-i"><Icon name="stopwatch" size={17} /></span>
-				<span class="kv-v nums" use:countUp={{ value: openNow }}>{openNow}</span>
-				<span class="kv-k">open now</span>
-			</div>
-			<div class="kv" use:reveal={{ index: 1 }}>
-				<span class="kv-i"><Icon name="helmet" size={17} /></span>
-				<span class="kv-v nums gold" use:countUp={{ value: data.rosterSize }}>{data.rosterSize}</span>
-				<span class="kv-k">dickheads</span>
-			</div>
-			<div class="kv" use:reveal={{ index: 2 }}>
-				<span class="kv-i"><Icon name="scoreboard" size={17} /></span>
-				<span class="kv-v nums" use:countUp={{ value: boardCount }}>{boardCount}</span>
-				<span class="kv-k">boards live</span>
-			</div>
+		<!-- Inline rather than three stacked tiles: same three numbers, one row
+		     instead of a 110px grid. -->
+		<div class="stats">
+			<span class="stat">
+				<Icon name="stopwatch" size={16} />
+				<b class="nums" use:countUp={{ value: openNow }}>{openNow}</b> open
+			</span>
+			<span class="stat">
+				<Icon name="helmet" size={16} />
+				<b class="nums" use:countUp={{ value: data.rosterSize }}>{data.rosterSize}</b> dickheads
+			</span>
+			<span class="stat">
+				<Icon name="scoreboard" size={16} />
+				<b class="nums" use:countUp={{ value: boardCount }}>{boardCount}</b> boards
+			</span>
 		</div>
 	</section>
 
 	<h2 class="rail">Surveys</h2>
 
 	{#if live.length === 0}
-		<div class="card">
-			<p class="muted">{EMPTY.noSurveys}</p>
-		</div>
+		<div class="card"><p class="muted">{EMPTY.noSurveys}</p></div>
 	{/if}
 
-	<div class="stack">
-		{#each live as s, i (s.id)}
+	<div class="grid">
+		{#each live as s (s.id)}
 			{@const meta = STATUS_META[s.status as SurveyStatus]}
-			<a class="tile tile--{s.status}" href="/s/{s.id}" use:reveal={{ index: i }}>
+			<a class="tile tile--{s.status}" href="/s/{s.id}">
 				<div class="tile-head">
 					<span class="tile-title">{s.title}</span>
 					<span class="badge badge--{s.status}">{meta.hubLabel}</span>
 				</div>
 				<p class="q-help">{s.blurb}</p>
 				<div class="tile-foot">
-					<span class="faint nums">{s.count} / {data.rosterSize} in</span>
+					<span class="faint nums">{s.count}/{data.rosterSize}</span>
 					<div class="meter" class:meter--live={s.status === 'open'} aria-hidden="true">
 						<i style="width:{pct(s.count)}%"></i>
 					</div>
-					<span class="cta">{CTA[s.status as SurveyStatus]} <Icon name="chevron" size={13} /></span>
+					<span class="cta">{CTA[s.status as SurveyStatus]} <Icon name="chevron" size={12} /></span>
 				</div>
 			</a>
 		{/each}
@@ -100,17 +95,17 @@
 
 	<h2 class="rail">Permanent boards</h2>
 
-	<div class="stack">
-		{#each data.boards as b, i (b.id)}
-			<a class="tile tile--board" href="/b/{b.id}" use:reveal={{ index: i }}>
+	<!-- Boards carry no badge and no footer. Every one of them was "Always on"
+	     above an "Open the board →" that repeated what the whole tile already
+	     is — two rows per card saying nothing. -->
+	<div class="grid grid--tight">
+		{#each data.boards as b (b.id)}
+			<a class="tile tile--board" href="/b/{b.id}">
 				<div class="tile-head">
 					<span class="tile-title">{b.title}</span>
-					<span class="badge badge--board">Always on</span>
+					<Icon name="chevron" size={13} class="tile-go" />
 				</div>
 				<p class="q-help">{b.blurb}</p>
-				<div class="tile-foot">
-					<span class="cta">Open the board <Icon name="chevron" size={13} /></span>
-				</div>
 			</a>
 		{/each}
 	</div>
@@ -154,16 +149,67 @@
 </div>
 
 <style>
+	/* Header and stats sit side by side and only stack when there is genuinely
+	   no room, which is the whole trick: use the width, not the height. */
+	.intro {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--s-4);
+		flex-wrap: wrap;
+		padding: var(--s-4);
+	}
+
+	.intro-text {
+		flex: 1 1 300px;
+		min-width: 0;
+	}
+
 	.headline {
 		font-size: var(--t-lg);
-		margin-bottom: var(--s-2);
+		margin-bottom: var(--s-1);
 		text-wrap: balance;
+	}
+
+	.intro .q-help {
+		margin-bottom: 0;
+	}
+
+	.stats {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--s-2);
+		flex: 0 1 auto;
+	}
+
+	.stat {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: var(--s-2) var(--s-3);
+		border: 1px solid var(--border);
+		border-radius: var(--r-pill);
+		background: var(--surface-2);
+		font-size: var(--t-sm);
+		color: var(--ink-soft);
+		white-space: nowrap;
+	}
+
+	.stat :global(.icon) {
+		color: var(--ink-faint);
+	}
+
+	.stat b {
+		font-family: var(--font-display);
+		font-size: var(--t-md);
+		color: var(--ok);
+		line-height: 1;
 	}
 
 	/* Section rails sit on the turf between cards, in chalk, the way the old
 	   hub separated its groups. */
 	.rail {
-		margin: var(--s-5) var(--s-1) var(--s-3);
+		margin: var(--s-4) var(--s-1) var(--s-2);
 		font-family: var(--font-mono);
 		font-size: 11px;
 		font-weight: 800;
@@ -173,16 +219,43 @@
 		opacity: 0.72;
 	}
 
+	/* Tiles go two and three across instead of one per row. Six cards that
+	   filled a screen and a half now fit in roughly half of one. */
+	.grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+		gap: var(--s-3);
+	}
+
+	.grid--tight {
+		grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+	}
+
 	.tile {
 		position: relative;
 		display: block;
-		padding: var(--s-4) var(--s-4) var(--s-4) var(--s-5);
+		padding: var(--s-3) var(--s-3) var(--s-3) var(--s-4);
 		border-radius: var(--r-md);
 		background: var(--surface);
 		box-shadow: var(--shadow-sm);
 		text-decoration: none;
 		overflow: hidden;
 		transition: transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+	}
+
+	.tile .q-help {
+		margin-bottom: 0;
+	}
+
+	.tile :global(.tile-go) {
+		color: var(--accent-ink);
+		transition: transform var(--dur-2) var(--ease);
+	}
+
+	@media (hover: hover) {
+		.tile:hover :global(.tile-go) {
+			transform: translateX(3px);
+		}
 	}
 
 	/* Status reads as a coloured spine down the left edge before you get to
@@ -233,31 +306,31 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--s-2);
-		margin-bottom: var(--s-1);
+		margin-bottom: 2px;
 		flex-wrap: wrap;
 	}
 
 	.tile-title {
 		font-family: var(--font-display);
 		text-transform: uppercase;
-		font-size: var(--t-md);
+		font-size: var(--t-base);
 		line-height: 1.15;
 	}
 
+	/* No rule above it and no padding either side of one: the row reads as the
+	   bottom of the card without costing 25px to say so. */
 	.tile-foot {
 		display: flex;
 		align-items: center;
-		gap: var(--s-3);
-		margin-top: var(--s-3);
-		padding-top: var(--s-3);
-		border-top: 1px dashed var(--border);
-		flex-wrap: wrap;
+		gap: var(--s-2);
+		margin-top: var(--s-2);
+		flex-wrap: nowrap;
 	}
 
 	.tile-foot .meter {
-		flex: 1 1 90px;
-		min-width: 70px;
-		max-width: 180px;
+		flex: 1 1 40px;
+		min-width: 32px;
+		height: 6px;
 	}
 
 	.cta {
