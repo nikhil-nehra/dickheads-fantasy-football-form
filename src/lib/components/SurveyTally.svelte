@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SurveyDefinition } from '$lib/surveys/types';
 	import { allQuestions } from '$lib/surveys/types';
+	import Icon from '$lib/components/Icon.svelte';
 	import {
 		singleTally,
 		ballotTally,
@@ -75,7 +76,8 @@
 				{#each rows as r, i (r.id)}
 					<div class="bar">
 						<span class="bar-label">
-							{#if i === 0}<strong>🏆 {r.label}</strong>{:else}{r.label}{/if}
+							{#if i === 0}<strong class="lead"><Icon name="trophy" size={15} /> {r.label}</strong
+							>{:else}{r.label}{/if}
 						</span>
 						<div class="meter"><i style="width:{r.pct}%"></i></div>
 						<span class="bar-n">{r.points} pts · {r.firsts} firsts</span>
@@ -158,6 +160,13 @@
 {/each}
 
 <style>
+	.lead {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		color: var(--accent-ink);
+	}
+
 	.turnout {
 		margin-bottom: var(--s-5);
 	}

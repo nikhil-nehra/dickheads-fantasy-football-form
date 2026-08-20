@@ -16,6 +16,8 @@
  * particular value. The old form had exactly one conditional (out-of-towners
  * see the in-person/virtual chips) and hardcoded it into the markup.
  */
+import type { IconName } from '$lib/icons';
+
 export type ShowIf =
 	| { question: string; equals: string }
 	| { question: string; answered: true };
@@ -29,7 +31,7 @@ type Base = {
 	showIf?: ShowIf;
 };
 
-export type Choice = { id: string; label: string; sub?: string };
+export type Choice = { id: string; label: string; sub?: string; icon?: IconName };
 
 /** One choice from a fixed list. Buy-in, locality, who-takes-the-punishment. */
 export type SingleQuestion = Base & {

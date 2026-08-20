@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
+	import { fly } from 'svelte/transition';
 	import QuestionRenderer from './QuestionRenderer.svelte';
 	import RichText from './RichText.svelte';
+	import Icon from './Icon.svelte';
 	import NegotiationSection from './NegotiationSection.svelte';
 	import { isVisible, type Question, type SurveyDefinition } from '$lib/surveys/types';
 	import { validateResponse } from '$lib/surveys/validate';
+	import { reveal } from '$lib/motion';
+	import { ERRORS, heckle } from '$lib/voice';
 	import type { BallotOption } from './types';
 
 	let {
@@ -122,16 +126,21 @@
 				   `r.json().catch(() => ({ ok: true }))`, so any non-JSON error
 				   response — including the HTML page a lock timeout produced —
 				   was reported to the user as a successful save. */
-				submitError = 'The commissioner closed this survey — responses are locked now.';
+				submitError = ERRORS.closedMidSession;
 				await invalidateAll();
 			} else if (body.errors?.length) {
-				fieldErrors = Object.fromEntries(body.errors.map((e) => [e.question, e.message]));
-				submitError = 'Some answers need another look.';
+				// Heckled, but never rewritten: the server's actual reason is still
+				// the body of every message, keyed so it doesn't reshuffle while
+				// somebody is reading it.
+				fieldErrors = Object.fromEntries(
+					body.errors.map((e) => [e.question, heckle(e.message, e.question)])
+				);
+				submitError = ERRORS.someWrong;
 			} else {
-				submitError = body.message ?? 'Something went wrong saving your response — try again.';
+				submitError = body.message ?? ERRORS.generic;
 			}
 		} catch {
-			submitError = "Couldn't reach the server. Check your connection and try again.";
+			submitError = ERRORS.network;
 		} finally {
 			submitting = false;
 			confirmOverwrite = false;
@@ -140,9 +149,9 @@
 </script>
 
 {#if done}
-	<div class="success">
-		<div class="stamp">{def.successStamp}</div>
-		<h2>You're locked in, {me.display_name.split(' ')[0]}.</h2>
+	<div class="success" in:fly={{ y: 12, duration: 320 }}>
+		<div class="stamp stamp--big stamp--slam">{def.successStamp}</div>
+		<h2 class="display">You're locked in, {me.display_name.split(' ')[0]}.</h2>
 		<p class="q-help">{def.successNote}</p>
 		<div class="row">
 			<button class="btn btn--ghost" onclick={() => (done = false)}>Make changes</button>
@@ -153,15 +162,19 @@
 	{#if hasSaved}
 		<p class="notice">
 			You already have an answer saved{savedAt ? ` (${savedAt} UTC)` : ''}. Saving again
-			overwrites it.
+			overwrites it, and the old one is gone for good.
 		</p>
 	{/if}
 
-	{#each def.sections as section (section.id)}
+	{#each def.sections as section, i (section.id)}
 		{@const shown = section.questions.filter(visible)}
 		{#if shown.length}
-			<div class="section">
-				<div class="down-tag">{section.tag}</div>
+			<div class="section" use:reveal={{ index: i, step: 40 }}>
+				<!-- The chain gang: the marker moves up as each section arrives. -->
+				<div class="down-tag">
+					<Icon name="marker" size={13} class="icon--advance" />
+					{section.tag}
+				</div>
 				{#if section.blurb}
 					<p class="q-help"><RichText text={section.blurb} /></p>
 				{/if}
@@ -196,74 +209,79 @@
 	{/each}
 
 	{#if canEdit}
-		<div class="section submit">
-			{#if submitError}
-				<p class="notice notice--danger" role="alert">{submitError}</p>
+		{#if submitError}
+			<p class="notice notice--danger" role="alert">{submitError}</p>
+		{/if}
+
+		{#if confirmOverwrite}
+			<p class="notice notice--danger">{ERRORS.overwrite}</p>
+		{/if}
+
+		<!-- The sticky gold bar from the original, which is the single reason
+		     nobody ever lost a half-filled form: the way out is always on
+		     screen, and it tells you what is standing between you and it. -->
+		<div class="savebar">
+			{#if !submitting && !valid && firstIssue}
+				<!-- Keyed on the offending question, so the flag is re-thrown each
+				     time a different thing is wrong rather than sitting there. -->
+				{#key firstIssue.question}
+					<span class="penalty"><Icon name="flag" size={22} class="icon--drop" /></span>
+				{/key}
 			{/if}
 
-			{#if confirmOverwrite}
-				<p class="notice notice--danger">
-					You already have a response saved. Locking in now will overwrite it — tap again to
-					confirm.
-				</p>
-			{/if}
+			<p class="savebar-txt" role="status">
+				{#if submitting}
+					Locking it in…
+				{:else if !valid && firstIssue}
+					{heckle(`${labelFor(firstIssue.question)} — ${firstIssue.message}`, firstIssue.question)}
+				{:else}
+					Everything checks out. Last chance to be sensible.
+				{/if}
+			</p>
 
 			<button class="btn btn--primary" disabled={submitting || !valid} onclick={submit}>
 				{#if submitting}
+					<Icon name="football" size={18} class="icon--spin" />
 					Locking it in…
 				{:else if confirmOverwrite}
-					Overwrite my previous answer
+					<Icon name="flag" size={18} />
+					Overwrite it
 				{:else}
+					<Icon name="lock" size={18} />
 					{def.submitLabel}
 				{/if}
 			</button>
-
-			{#if !valid && firstIssue}
-				<p class="hint" role="status">
-					{labelFor(firstIssue.question)} — {firstIssue.message}
-				</p>
-			{/if}
 		</div>
 	{/if}
 {/if}
 
 <style>
-	.submit {
-		position: sticky;
-		bottom: 0;
-		background: var(--surface);
-		padding-bottom: calc(var(--s-4) + env(safe-area-inset-bottom));
-	}
-
-	.hint {
-		margin-top: var(--s-2);
-		text-align: center;
-		font-size: var(--t-sm);
-		color: var(--ink-soft);
+	.penalty {
+		flex: 0 0 auto;
+		display: inline-flex;
+		color: var(--gold);
 	}
 
 	.success {
+		padding: var(--s-6) var(--s-2);
 		text-align: center;
 	}
 
-	.stamp {
-		display: inline-block;
-		margin-bottom: var(--s-4);
-		padding: var(--s-3) var(--s-5);
-		border: 4px double var(--danger);
-		border-radius: var(--r-sm);
-		color: var(--danger);
-		font-family: var(--font-display);
-		font-size: var(--t-lg);
-		font-weight: 800;
-		letter-spacing: 0.08em;
-		line-height: 1.1;
-		white-space: pre-line;
-		transform: rotate(-6deg);
+	.success .stamp {
+		margin-bottom: var(--s-5);
+	}
+
+	.success h2 {
+		font-size: var(--t-xl);
+		text-wrap: balance;
+	}
+
+	.success .q-help {
+		margin-top: var(--s-2);
 	}
 
 	.success .row {
 		justify-content: center;
-		margin-top: var(--s-4);
+		margin-top: var(--s-5);
 	}
 </style>

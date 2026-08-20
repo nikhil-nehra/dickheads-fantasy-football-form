@@ -1,5 +1,6 @@
 <script lang="ts">
 	import RankList from '$lib/components/RankList.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 	import type { RankItem } from '$lib/components/types';
 	import type { AvailabilityQuestion } from '$lib/surveys/types';
 
@@ -105,7 +106,11 @@
 			aria-controls="days-{item.id}"
 			onclick={() => (expanded = expanded === item.id ? null : item.id)}
 		>
-			{expanded === item.id ? 'Done ✓' : "📅 Can't make it?"}
+			{#if expanded === item.id}
+				Done ✓
+			{:else}
+				<Icon name="stopwatch" size={14} /> Can't make it?
+			{/if}
 		</button>
 
 		<button type="button" class="linkish" {disabled} onclick={() => toggleWholeWindow(item.id)}>

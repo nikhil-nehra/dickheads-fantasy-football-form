@@ -9,6 +9,8 @@
 	import type { SurveyStatus } from '$lib/server/db';
 	import type { NegotiationQuestion } from '$lib/surveys/types';
 	import { allQuestions } from '$lib/surveys/types';
+	import { reduced } from '$lib/motion';
+	import Icon from '$lib/components/Icon.svelte';
 
 	let { data } = $props();
 
@@ -16,6 +18,23 @@
 	let busy = $state('');
 	let flash = $state('');
 	let error = $state('');
+
+	/* ── "The commissioner sees all" ────────────────────────────────────────
+	   A pair of eyes on the League Control card that follow the pointer. They
+	   do nothing and control nothing; they are here because the original kept
+	   promising the commissioner was watching and never once showed it. */
+	let eyes = $state<HTMLElement | null>(null);
+	let pupil = $state({ x: 0, y: 0 });
+
+	function trackEyes(e: PointerEvent) {
+		if (!eyes || tab !== 'control' || reduced()) return;
+		const box = eyes.getBoundingClientRect();
+		const dx = e.clientX - (box.left + box.width / 2);
+		const dy = e.clientY - (box.top + box.height / 2);
+		const dist = Math.hypot(dx, dy) || 1;
+		const travel = Math.min(3, dist / 30);
+		pupil = { x: (dx / dist) * travel, y: (dy / dist) * travel };
+	}
 
 	async function post(url: string, body: unknown, note: string) {
 		busy = note;
@@ -152,6 +171,8 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
+<svelte:window onpointermove={trackEyes} />
+
 <div class="shell shell--wide">
 	{#if !data.authed}
 		<section class="card">
@@ -159,7 +180,16 @@
 		</section>
 	{:else}
 		{#if error}<p class="notice notice--danger" role="alert">{error}</p>{/if}
-		{#if flash}<p class="notice notice--ok" role="status">Done: {flash}</p>{/if}
+		{#if flash}
+			<!-- Keyed on the message so the whistle blows again on every ruling,
+			     not just the first one of the session. -->
+			{#key flash}
+				<p class="notice notice--ok ruled" role="status">
+					<Icon name="whistle" size={18} class="icon--blow" />
+					Done: {flash}
+				</p>
+			{/key}
+		{/if}
 
 		<div class="tabs" role="tablist" aria-label="Desk sections">
 			<button
@@ -192,7 +222,13 @@
 
 		{#if tab === 'control'}
 			<section class="card">
-				<h2>League Control</h2>
+				<div class="head">
+					<h2 class="display">League Control</h2>
+					<span class="watcher" bind:this={eyes} aria-hidden="true" title="The commissioner sees all">
+						<i style="--px:{pupil.x}px; --py:{pupil.y}px"></i>
+						<i style="--px:{pupil.x}px; --py:{pupil.y}px"></i>
+					</span>
+				</div>
 
 				{#if data.problems.length}
 					<div class="notice notice--danger">
@@ -245,7 +281,7 @@
 			</section>
 		{:else if tab === 'rivalries'}
 			<section class="card">
-				<h2>Rivalries</h2>
+				<h2 class="display">Rivalries</h2>
 
 				{#if data.pairings.length === 0}
 					<p class="q-help">
@@ -345,7 +381,7 @@
 			</section>
 		{:else if tab === 'sleeper'}
 			<section class="card">
-				<h2>Sleeper accounts</h2>
+				<h2 class="display">Sleeper accounts</h2>
 				<p class="q-help">
 					Nobody in this league uses their real name as a handle, so nothing links itself.
 					Suggestions below are guesses from the handle and team name — confirm the ones that
@@ -412,7 +448,7 @@
 			{@const s = data.surveys.find((x) => x.def.id === tab)}
 			{#if s}
 				<section class="card">
-					<h2>{s.def.title}</h2>
+					<h2 class="display">{s.def.title}</h2>
 					<SurveyTally
 						def={s.def}
 						submissions={s.submissions}
@@ -426,33 +462,104 @@
 </div>
 
 <style>
+	/* The original's tab rail: a dark inset trough on the turf with the active
+	   tab punched out in chalk. Scrolls sideways rather than wrapping, so the
+	   desk keeps one row of tabs on a phone. */
 	.tabs {
 		display: flex;
-		flex-wrap: wrap;
-		gap: var(--s-2);
+		gap: var(--s-1);
+		overflow-x: auto;
+		padding: var(--s-1);
 		margin-bottom: var(--s-4);
+		border-radius: var(--r-md);
+		background: rgb(0 0 0 / 22%);
+		-webkit-overflow-scrolling: touch;
+		scrollbar-width: none;
+	}
+
+	.tabs::-webkit-scrollbar {
+		display: none;
 	}
 
 	.tabs button {
-		min-height: var(--tap);
+		flex: 1 0 auto;
+		min-height: 40px;
 		padding: 0 var(--s-4);
-		border-radius: var(--r-pill);
-		border: 1px solid rgb(244 239 226 / 30%);
+		border-radius: var(--r-sm);
+		border: 0;
 		background: transparent;
 		color: var(--chalk-dim);
-		font-weight: 700;
+		font-size: var(--t-sm);
+		font-weight: 800;
+		white-space: nowrap;
 		cursor: pointer;
+		transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+			transform var(--dur-1) var(--ease);
+	}
+
+	.tabs button:active {
+		transform: scale(0.97);
+	}
+
+	@media (hover: hover) {
+		.tabs button:not(.on):hover {
+			background: rgb(255 255 255 / 10%);
+			color: var(--gold-bright);
+		}
 	}
 
 	.tabs button.on {
 		background: var(--chalk);
 		color: var(--turf-dark);
-		border-color: var(--chalk);
 	}
 
 	.ctl {
-		padding: var(--s-4) 0;
-		border-top: 1px solid var(--border);
+		padding: var(--s-4);
+		margin-bottom: var(--s-3);
+		border: 1px solid var(--border);
+		border-radius: var(--r-md);
+		background: var(--surface-2);
+	}
+
+	.ruled {
+		display: flex;
+		align-items: center;
+		gap: var(--s-2);
+	}
+
+	.head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--s-3);
+		margin-bottom: var(--s-4);
+	}
+
+	.watcher {
+		display: flex;
+		gap: 6px;
+		flex: 0 0 auto;
+	}
+
+	.watcher i {
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: var(--chalk);
+		border: 1px solid var(--border-strong);
+		position: relative;
+		overflow: hidden;
+	}
+
+	/* The pupil moves inside the eye; the eye itself stays put. */
+	.watcher i::after {
+		content: '';
+		position: absolute;
+		inset: 4px;
+		border-radius: 50%;
+		background: var(--turf-dark);
+		translate: var(--px, 0) var(--py, 0);
+		transition: translate var(--dur-2) var(--ease);
 	}
 
 	.ctl-head {

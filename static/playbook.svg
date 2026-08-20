@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" width="480" height="480">
+	<!--
+		THE PLAYBOOK
+		────────────────────────────────────────────────────────────────────────
+		The site's background: a coach's chalk diagram over the green ground,
+		tiled at 480px.
+
+		Two constraints shaped it. It has to READ as football at a glance — X's,
+		O's, routes and blocking arrows, not an abstract stripe — and it has to
+		disappear behind body text, so every stroke is chalk at 10-16% opacity
+		and nothing is filled solid.
+
+		Tiling: the line of scrimmage runs the full width, so it joins seamlessly
+		left-to-right. Everything else is kept clear of the edges rather than
+		cut across them, which is what stops the repeat reading as wallpaper
+		with visible seams.
+	-->
+	<defs>
+		<marker id="tip" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+			<path d="M0 0 10 5 0 10z" fill="#F4EFE2" />
+		</marker>
+	</defs>
+
+	<g fill="none" stroke="#F4EFE2" stroke-linecap="round" stroke-linejoin="round">
+		<!-- ── Line of scrimmage ─────────────────────────────────────────── -->
+		<g opacity="0.14">
+			<line x1="0" y1="150" x2="480" y2="150" stroke-width="2" stroke-dasharray="14 10" />
+		</g>
+
+		<!-- ── Offensive set, just behind the line ───────────────────────── -->
+		<g opacity="0.16" stroke-width="2.4">
+			<!-- receivers -->
+			<circle cx="90" cy="172" r="9" />
+			<circle cx="132" cy="172" r="9" />
+			<circle cx="300" cy="172" r="9" />
+			<circle cx="404" cy="172" r="9" />
+			<!-- the quarterback, under centre -->
+			<circle cx="240" cy="196" r="9" />
+			<!-- defenders -->
+			<path d="M233 121l14 14M247 121l-14 14" />
+			<path d="M353 121l14 14M367 121l-14 14" />
+		</g>
+
+		<!-- ── Routes ────────────────────────────────────────────────────── -->
+		<g opacity="0.13" stroke-width="2.2" marker-end="url(#tip)">
+			<!-- go -->
+			<path d="M90 160V54" />
+			<!-- slant -->
+			<path d="M132 160l58-66" />
+			<!-- curl: up, then hooked back toward the ball -->
+			<path d="M300 160V92c0 -18 -22 -20 -30 -6" />
+			<!-- out -->
+			<path d="M404 160v-52h56" />
+		</g>
+
+		<!-- ── Motion, pre-snap ──────────────────────────────────────────── -->
+		<g opacity="0.12" stroke-width="2" stroke-dasharray="3 7" marker-end="url(#tip)">
+			<path d="M170 178c-34 6 -60 14 -92 22" />
+		</g>
+
+		<!-- ── Blocking assignments: the stubby T-ended arrows ───────────── -->
+		<g opacity="0.12" stroke-width="2.2">
+			<path d="M216 208l-22 26" />
+			<path d="M186 226l16 16" />
+			<path d="M264 208l22 26" />
+			<path d="M294 226l-16 16" />
+		</g>
+
+		<!-- ── Second play, lower half of the sheet ──────────────────────── -->
+		<g opacity="0.15" stroke-width="2.4">
+			<path d="M143 346l14 14M157 346l-14 14" />
+			<path d="M196 358l14 14M210 358l-14 14" />
+			<circle cx="352" cy="334" r="9" />
+			<circle cx="72" cy="392" r="9" />
+		</g>
+
+		<g opacity="0.12" stroke-width="2.2" marker-end="url(#tip)">
+			<!-- post -->
+			<path d="M352 322v-40l-46 -44" />
+			<!-- wheel -->
+			<path d="M72 380c0 -34 26 -44 46 -30" />
+		</g>
+
+		<!-- ── Coach's hash: a stray tick, because real ones have them ───── -->
+		<g opacity="0.10" stroke-width="2">
+			<line x1="240" y1="418" x2="240" y2="438" />
+			<line x1="420" y1="440" x2="440" y2="440" />
+		</g>
+	</g>
+</svg>

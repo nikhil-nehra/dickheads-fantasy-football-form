@@ -15,7 +15,8 @@ export const intake: SurveyDefinition = {
 	short: 'Intake',
 	blurb:
 		'Buy-in, punishment ideas, draft availability, rivalry rankings and the prize split.',
-	submitLabel: 'Lock It In 🔒',
+	// The padlock is now an icon inside the button, not an emoji in the string.
+	submitLabel: 'Lock It In',
 	successStamp: 'OFFICIALLY\nENTERED',
 	successNote: 'Your answers are on record. The commissioner sees all.',
 
@@ -71,9 +72,12 @@ export const intake: SurveyDefinition = {
 					help: "First, tell us where you're coming from — in town (Dallas) or out of town.",
 					required: true,
 					layout: 'chips',
+					// Icons rather than the emoji these labels used to carry: 📍 and
+					// ✈️ rendered as a different picture per platform and could not
+					// take the selected-chip colour.
 					options: [
-						{ id: 'local', label: '📍 In town (Dallas)' },
-						{ id: 'oot', label: '✈️ Out of town' }
+						{ id: 'local', label: 'In town (Dallas)', icon: 'home' },
+						{ id: 'oot', label: 'Out of town', icon: 'away' }
 					]
 				},
 				{

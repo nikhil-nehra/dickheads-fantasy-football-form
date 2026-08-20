@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { flip } from 'svelte/animate';
 	import type { Snippet } from 'svelte';
+	import Icon from './Icon.svelte';
 	import type { RankItem } from './types';
 
 	let {
@@ -103,10 +104,31 @@
 		dragging = null;
 	}
 
+	/* The beef ladder. Top of the list is hot red, the bottom cools to blue,
+	   exactly as the original did it — but as saturated rows carrying white
+	   text rather than the pale tints that replaced them, because the whole
+	   point is that the top of this list should look dangerous.
+
+	   Lightness runs 42% → 32% rather than the original's 45% → 37%, which is
+	   what buys white text a passing contrast ratio at the cool end. */
+	function ratio(i: number): number {
+		return ordered.length < 2 ? 1 : 1 - i / (ordered.length - 1);
+	}
+
 	function heat(i: number): string {
-		if (!heatmap || ordered.length < 2) return '';
-		const h = 1 - i / (ordered.length - 1);
-		return `--heat-bg: hsl(${210 - h * 210} 60% ${94 - h * 8}%); --heat-bd: hsl(${210 - h * 210} 55% ${70 - h * 12}%)`;
+		if (!heatmap) return '';
+		const h = ratio(i);
+		const hue = 210 - h * 210;
+		return (
+			`--heat-bg: hsl(${hue} 62% ${42 - h * 10}%);` +
+			`--heat-bd: hsl(${hue} 62% ${34 - h * 10}%);` +
+			`--heat-fg: #fff`
+		);
+	}
+
+	/** One flame per fifth of the way up the ladder, minimum one. */
+	function flameCount(i: number): number {
+		return Math.max(1, Math.round(ratio(i) * 5));
 	}
 </script>
 
@@ -128,6 +150,14 @@
 					<span class="name">{item.label}</span>
 					{#if item.sub}<span class="sub">{item.sub}</span>{/if}
 				</span>
+
+				{#if heatmap}
+					<span class="flames" aria-hidden="true">
+						{#each { length: flameCount(i) } as _, f (f)}
+							<Icon name="flame" size={14} />
+						{/each}
+					</span>
+				{/if}
 
 				<span class="controls">
 					<button
@@ -186,7 +216,9 @@
 		border-radius: var(--r-md);
 		border: 2px solid var(--heat-bd, var(--border));
 		background: var(--heat-bg, var(--surface-2));
+		color: var(--heat-fg, inherit);
 		touch-action: none;
+		transition: box-shadow var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
 	}
 
 	.head {
@@ -199,18 +231,41 @@
 		padding: var(--s-2) 0 var(--s-1);
 	}
 
+	/* Picked up off the page rather than merely outlined, so it is obvious
+	   which row the pointer currently owns. */
 	li.dragging {
-		box-shadow: var(--shadow-sm);
+		box-shadow: var(--shadow-lift);
 		border-color: var(--gold);
+		transform: scale(1.02);
+		position: relative;
+		z-index: 2;
+		transition: none;
 	}
 
 	.pos {
 		flex: 0 0 auto;
 		width: 24px;
 		text-align: center;
+		font-family: var(--font-mono);
 		font-weight: 800;
-		color: var(--ink-soft);
+		color: var(--heat-fg, var(--ink-soft));
+		opacity: 0.85;
 		font-variant-numeric: tabular-nums;
+	}
+
+	/* Decorative: the position number and the aria-label already carry the
+	   ranking. Overlapped slightly so five flames read as one fire. */
+	.flames {
+		flex: 0 0 auto;
+		display: inline-flex;
+		align-items: center;
+		padding-right: var(--s-1);
+		color: var(--heat-fg, var(--danger));
+		filter: drop-shadow(0 1px 1px rgb(0 0 0 / 35%));
+	}
+
+	.flames :global(.icon + .icon) {
+		margin-left: -4px;
 	}
 
 	.body {
@@ -226,7 +281,8 @@
 
 	.sub {
 		font-size: var(--t-sm);
-		color: var(--ink-soft);
+		color: var(--heat-fg, var(--ink-soft));
+		opacity: 0.82;
 	}
 
 	.controls {
@@ -247,8 +303,13 @@
 		background: transparent;
 		border-radius: var(--r-sm);
 		font-size: var(--t-md);
-		color: var(--ink-soft);
+		color: var(--heat-fg, var(--ink-soft));
 		cursor: pointer;
+		transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+	}
+
+	.arrow:active:not(:disabled) {
+		transform: scale(0.88);
 	}
 
 	.handle {
@@ -266,11 +327,12 @@
 		cursor: not-allowed;
 	}
 
+	/* A neutral translucent wash, so one rule reads correctly on a pale
+	   availability row and on a saturated red beef row alike. */
 	@media (hover: hover) {
 		.arrow:hover:not(:disabled),
 		.handle:hover:not(:disabled) {
-			background: var(--surface-3);
-			color: var(--ink);
+			background: rgb(127 127 127 / 24%);
 		}
 	}
 

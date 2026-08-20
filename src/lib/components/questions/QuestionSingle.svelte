@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SingleQuestion } from '$lib/surveys/types';
+	import Icon from '$lib/components/Icon.svelte';
 
 	type Value = { choice?: string; other?: string };
 
@@ -33,6 +34,8 @@
 					onchange={() => pick(opt.id)}
 				/>
 				<span class="face">
+					<!-- Decorative: the label right beside it says the same thing. -->
+					{#if opt.icon}<Icon name={opt.icon} size={18} />{/if}
 					<span class="label">{opt.label}</span>
 					{#if opt.sub}<span class="sub">{opt.sub}</span>{/if}
 				</span>
@@ -105,6 +108,7 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		gap: var(--s-2);
 		min-height: var(--tap);
 		padding: 0 var(--s-4);
 		border-radius: var(--r-pill);

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import Icon from '$lib/components/Icon.svelte';
+	import { ERRORS } from '$lib/voice';
 
 	let { length = 4 }: { length?: number } = $props();
 
@@ -7,6 +9,18 @@
 	let error = $state('');
 	let busy = $state(false);
 	let shake = $state(false);
+	let attempts = $state(0);
+
+	/* Escalating contempt. The message still says "wrong", every time — this
+	   only decides how rude the sentence after it is. */
+	const TAUNTS = [
+		'',
+		'Second time. It is four digits.',
+		'Third. Whatever you are trying, it is not that.',
+		'You are not the commissioner and everyone can see that now.'
+	];
+
+	let taunt = $derived(TAUNTS[Math.min(attempts, TAUNTS.length - 1)]);
 
 	const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
 
@@ -58,9 +72,10 @@
 			}
 
 			const body = (await res.json().catch(() => ({}))) as { message?: string };
-			error = body.message ?? "That's not it.";
+			attempts += 1;
+			error = body.message ?? ERRORS.badPin;
 			shake = true;
-			setTimeout(() => (shake = false), 400);
+			setTimeout(() => (shake = false), 450);
 			digits = [];
 		} catch {
 			error = "Couldn't reach the server.";
@@ -77,8 +92,12 @@
 <svelte:window onkeydown={onKeydown} />
 
 <div class="vault">
-	<h2>Commissioner's Desk</h2>
-	<p class="q-help">Enter the {length}-digit code. Type it or tap it.</p>
+	<span class="lock"><Icon name="lock" size={38} /></span>
+	<h2 class="display">Commissioner's Desk</h2>
+	<p class="q-help">
+		Enter the {length}-digit code. Type it or tap it. If you don't have it, you were not supposed to
+		be here.
+	</p>
 
 	<div class="pad" class:shake>
 		<div class="dots" aria-hidden="true">
@@ -106,7 +125,7 @@
 	</div>
 
 	{#if error}
-		<p class="notice notice--danger" role="alert">{error}</p>
+		<p class="notice notice--danger" role="alert">{error} {taunt}</p>
 	{/if}
 </div>
 
@@ -115,6 +134,18 @@
 		text-align: center;
 		max-width: 320px;
 		margin: 0 auto;
+		padding: var(--s-4) 0;
+	}
+
+	.lock {
+		display: block;
+		color: var(--accent-ink);
+		margin-bottom: var(--s-2);
+	}
+
+	.vault h2 {
+		font-size: var(--t-lg);
+		margin-bottom: var(--s-2);
 	}
 
 	.pad:focus-visible {
@@ -126,7 +157,7 @@
 	.dots {
 		display: flex;
 		justify-content: center;
-		gap: var(--s-3);
+		gap: var(--s-4);
 		margin: var(--s-5) 0;
 	}
 
@@ -134,12 +165,14 @@
 		width: 14px;
 		height: 14px;
 		border-radius: 50%;
-		border: 2px solid var(--border-strong);
+		border: 2px solid var(--turf-line);
+		transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--spring);
 	}
 
 	.dot.filled {
 		background: var(--gold);
 		border-color: var(--gold);
+		transform: scale(1.25);
 	}
 
 	.keys {
@@ -148,30 +181,37 @@
 		gap: var(--s-2);
 	}
 
+	/* Keys go turf-green under the finger, the way the original's did — the
+	   only feedback a four-digit pad can give you. */
 	.keys button {
 		min-height: 56px;
 		border-radius: var(--r-md);
-		border: 1px solid var(--border-strong);
+		border: 1.5px solid var(--border-strong);
 		background: var(--surface-2);
+		font-family: var(--font-mono);
 		font-size: var(--t-lg);
 		font-weight: 700;
 		cursor: pointer;
+		transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+			border-color var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+	}
+
+	.keys button:active:not(:disabled) {
+		transform: scale(0.94);
+		background: var(--turf-mid);
+		border-color: var(--turf-mid);
+		color: var(--chalk);
+	}
+
+	@media (hover: hover) {
+		.keys button:hover:not(:disabled) {
+			background: var(--turf-mid);
+			border-color: var(--turf-mid);
+			color: var(--chalk);
+		}
 	}
 
 	.keys button:disabled {
 		opacity: 0.5;
-	}
-
-	.shake {
-		animation: shake 0.35s;
-	}
-
-	@keyframes shake {
-		25% {
-			transform: translateX(-8px);
-		}
-		75% {
-			transform: translateX(8px);
-		}
 	}
 </style>

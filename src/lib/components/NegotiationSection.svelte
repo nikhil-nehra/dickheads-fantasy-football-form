@@ -88,10 +88,13 @@
 		they're posted.
 	</p>
 {:else}
+	<!-- The broadcast title card, matching the one the public rivalry board
+	     uses, so a pairing looks the same wherever you meet it. -->
 	<div class="vs">
-		<span>{me.display_name}</span>
-		<span class="vs-mark">vs</span>
-		<span>{rivalName}</span>
+		<span class="vs-name">{me.display_name}</span>
+		<span class="vs-mark" aria-hidden="true">VS</span>
+		<span class="vs-name">{rivalName}</span>
+		<span class="sr-only">versus</span>
 	</div>
 
 	{#if err}<p class="notice notice--danger" role="alert">{err}</p>{/if}
@@ -201,23 +204,50 @@
 
 <style>
 	.vs {
+		position: relative;
+		overflow: hidden;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		flex-wrap: wrap;
 		gap: var(--s-3);
-		padding: var(--s-3);
+		padding: var(--s-4) var(--s-3);
 		margin-bottom: var(--s-4);
 		border-radius: var(--r-md);
-		background: var(--field-2);
+		background: linear-gradient(135deg, var(--turf-mid), var(--turf-dark));
 		color: var(--chalk);
-		font-weight: 800;
 		text-align: center;
 	}
 
-	.vs-mark {
-		color: var(--gold);
+	.vs::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: repeating-linear-gradient(90deg, rgb(255 255 255 / 4%) 0 2px, transparent 2px 40px);
+	}
+
+	.vs-name {
+		position: relative;
 		font-family: var(--font-display);
-		font-style: italic;
+		text-transform: uppercase;
+		font-size: clamp(14px, 4vw, 18px);
+		line-height: 1.1;
+		overflow-wrap: anywhere;
+	}
+
+	.vs-mark {
+		position: relative;
+		flex: 0 0 auto;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		background: var(--chalk);
+		color: var(--endzone);
+		font-family: var(--font-display);
+		font-size: 12px;
 	}
 
 	.neg {

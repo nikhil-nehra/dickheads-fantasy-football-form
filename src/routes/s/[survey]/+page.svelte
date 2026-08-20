@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { fly } from 'svelte/transition';
 	import SurveyForm from '$lib/components/SurveyForm.svelte';
+	import { EMPTY, NAG } from '$lib/voice';
 
 	let { data } = $props();
 
@@ -23,7 +25,7 @@
 
 <div class="shell">
 	<section class="card">
-		<h2>{data.def.title}</h2>
+		<h2 class="display title">{data.def.title}</h2>
 		<p class="q-help">{data.def.blurb}</p>
 
 		{#if !data.statusMeta.writable}
@@ -47,6 +49,17 @@
 					<option value={p.id}>{p.display_name}</option>
 				{/each}
 			</select>
+
+			{#if data.me}
+				<!-- Keyed on the respondent so it replays every time somebody
+				     changes their mind about who they are. -->
+				{#key data.me.id}
+					<p class="nag" in:fly={{ y: -8, duration: 420 }}>
+						<span>{NAG.first}</span>
+						<span class="nag-second">{NAG.second}</span>
+					</p>
+				{/key}
+			{/if}
 		</div>
 
 		{#if data.me}
@@ -67,7 +80,45 @@
 				/>
 			{/key}
 		{:else}
-			<p class="muted">Pick your name to get started.</p>
+			<p class="muted unpicked">{EMPTY.notPicked}</p>
 		{/if}
 	</section>
 </div>
+
+<style>
+	.title {
+		font-size: var(--t-xl);
+		margin-bottom: var(--s-2);
+	}
+
+	/* The nag, straight from the original: a soft amber slip of paper that
+	   appears the moment somebody picks a name. Tokenised rather than the
+	   original's three literals, so it survives dark mode. */
+	.nag {
+		margin-top: var(--s-3);
+		padding: var(--s-3);
+		border-radius: var(--r-md);
+		border: 1px solid var(--accent);
+		background: var(--warn-soft);
+		color: var(--warn);
+		font-size: var(--t-sm);
+		font-weight: 600;
+		line-height: 1.5;
+	}
+
+	.nag-second {
+		display: block;
+		margin-top: var(--s-2);
+		font-weight: 800;
+		color: var(--ink);
+	}
+
+	.unpicked {
+		padding: var(--s-5) var(--s-4);
+		border: 1.5px dashed var(--border-strong);
+		border-radius: var(--r-md);
+		background: var(--surface-2);
+		text-align: center;
+		font-size: var(--t-sm);
+	}
+</style>

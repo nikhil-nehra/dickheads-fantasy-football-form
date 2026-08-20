@@ -1,12 +1,44 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="The Dickhead's League">
-	<rect width="32" height="32" rx="6" fill="#122A1C" />
-	<g fill="#1D4A30">
-		<rect x="0" y="0" width="8" height="32" />
-		<rect x="16" y="0" width="8" height="32" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="The Dickhead's Football League">
+	<!--
+		The crest, redrawn for 32 pixels.
+
+		DFFL_Logo.png is 623px of bevelled gold line-work over a navy shield; at
+		favicon size every one of those strokes collapses into brown mud. This
+		keeps only what survives the shrink: the shield outline, the two balls,
+		and the ribbon. No gradients, no bevel, no lettering — "DFL" at this
+		size is three grey smudges.
+	-->
+	<defs>
+		<clipPath id="shield">
+			<path d="M2 3h28v13c0 8-6.5 12.5-14 16C8.5 28.5 2 24 2 16Z" />
+		</clipPath>
+	</defs>
+
+	<!-- Shield body -->
+	<path d="M2 3h28v13c0 8-6.5 12.5-14 16C8.5 28.5 2 24 2 16Z" fill="#173456" />
+
+	<!-- Gold rim, drawn inside the clip so the stroke stays even -->
+	<g clip-path="url(#shield)">
+		<path
+			d="M2 3h28v13c0 8-6.5 12.5-14 16C8.5 28.5 2 24 2 16Z"
+			fill="none"
+			stroke="#E7C770"
+			stroke-width="3"
+		/>
 	</g>
-	<g stroke="#F4EFE2" stroke-width="1.5" opacity="0.5">
-		<line x1="0" y1="6" x2="32" y2="6" />
-		<line x1="0" y1="26" x2="32" y2="26" />
+
+	<!-- The two footballs, tilted toward each other as on the crest -->
+	<g fill="#E7C770">
+		<ellipse cx="11.4" cy="14.2" rx="5.4" ry="3.4" transform="rotate(-32 11.4 14.2)" />
+		<ellipse cx="20.6" cy="14.2" rx="5.4" ry="3.4" transform="rotate(32 20.6 14.2)" />
 	</g>
-	<rect x="4" y="14" width="24" height="4" rx="2" fill="#D4A017" />
+	<!-- Laces: two short chalk strokes, enough to read as footballs at 16px -->
+	<g stroke="#173456" stroke-width="1.1" stroke-linecap="round">
+		<line x1="9.6" y1="15.6" x2="13.2" y2="12.8" />
+		<line x1="18.8" y1="12.8" x2="22.4" y2="15.6" />
+	</g>
+
+	<!-- DFL ribbon -->
+	<path d="M7 21.5h18v4H7Z" fill="#A32638" />
+	<path d="M7 21.5h18v4H7Z" fill="none" stroke="#E7C770" stroke-width="0.8" />
 </svg>

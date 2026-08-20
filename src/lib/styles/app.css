@@ -1,22 +1,37 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    THE DICKHEAD'S LEAGUE — design system
    ═══════════════════════════════════════════════════════════════════════════
-   Turf and chalk, carried over from the original league.css because the
-   identity was genuinely good. What changed is the discipline: that file had
-   197 hardcoded hex literals across 56 unique values, no spacing or type
-   scale, half-pixel font sizes, 15 selectors declared twice, two separate
-   never-merged 480px breakpoints, nothing above 640px, and no dark mode.
+   Turf and chalk, amplified. The original league.css had the identity but no
+   discipline: 197 hardcoded hex literals, no spacing or type scale, half-pixel
+   font sizes, duplicate selectors, two unmerged breakpoints and no dark mode.
+   The rewrite that followed had the discipline but sanded the identity off —
+   Georgia instead of Arial Black, a flat banner, buttons with no press.
+
+   This file is both. Tokens and scales all the way down, and every piece of
+   the field back on top of them: yard lines, the gold goal-line rule, chunky
+   three-dimensional buttons, rubber stamps, down markers.
+
+   Motion is a first-class layer here (see motion.ts). Everything animated is
+   built from the tokens in the MOTION block and everything collapses under
+   `prefers-reduced-motion`.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
 	/* ── Palette ─────────────────────────────────────────────────────────── */
+	/* Navy and gold are sampled straight out of DFFL_Logo.png so the crest sits
+	   on the page as a native element rather than a sticker. The greens are the
+	   original turf. The two never meet: navy is chrome (banner, footer, nav),
+	   green is the playing surface everything else sits on. */
+	--navy: #173456;
+	--navy-deep: #0e2340;
+	--navy-light: #21497a;
 	--turf-dark: #122a1c;
 	--turf-mid: #1d4a30;
 	--turf-line: #2e6b45;
 	--chalk: #f4efe2;
 	--chalk-dim: #e6dec8;
-	--gold: #d4a017;
-	--gold-bright: #f0c242;
+	--gold: #c9a227;
+	--gold-bright: #e7c770;
 	--endzone: #a32638;
 	--endzone-dim: #f4d9dc;
 
@@ -33,12 +48,24 @@
 	--ink-faint: #8a8672;
 	--accent: var(--gold);
 	--accent-ink: #8a5a00;
+	--accent-soft: #fff6da;
 	--danger: var(--endzone);
 	--danger-soft: var(--endzone-dim);
 	--ok: #1f7a45;
 	--ok-soft: #dff2e6;
+	/* The amber family — drafts, the name nag, anything "hold on a second". */
+	--warn: #8a5a00;
+	--warn-soft: #fbe7c2;
 	--on-field: var(--chalk);
 	--on-field-dim: var(--chalk-dim);
+
+	/* Press-down colours for the 3D buttons. These sit under saturated button
+	   faces, so they hold up in both themes and are deliberately not themed. */
+	--press-turf: #0e2e1c;
+	--press-gold: #9a7a14;
+	--press-danger: #7a1b29;
+	--press-flat: #b4ae9e;
+	--press-navy: #0a1a30;
 
 	/* ── Scales ──────────────────────────────────────────────────────────── */
 	--s-1: 4px;
@@ -63,14 +90,29 @@
 
 	--shadow: 0 10px 30px rgb(10 20 12 / 18%);
 	--shadow-sm: 0 2px 8px rgb(10 20 12 / 10%);
+	--shadow-lift: 0 18px 44px rgb(10 20 12 / 26%);
 
 	/* Minimum comfortable touch target. The old drag handles were 34x42 and
 	   the podium remove button about 17x17. */
 	--tap: 44px;
 
 	--font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	--font-display: 'Georgia', 'Times New Roman', serif;
+	/* Arial Black is the league's voice. It is on every machine that matters
+	   and needs no webfont request, which is why the original used it. */
+	--font-display: 'Arial Black', 'Arial Bold', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 	--font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+
+	/* ── MOTION ──────────────────────────────────────────────────────────── */
+	--dur-1: 120ms; /* state flips: press, hover, check */
+	--dur-2: 220ms; /* element enter/exit */
+	--dur-3: 420ms; /* reveals, meters */
+	--dur-4: 700ms; /* count-ups, the stamp */
+	/* The easing the original used for its one good animation, kept as the
+	   house curve: fast out of the gate, settles without bouncing. */
+	--ease: cubic-bezier(0.2, 0.85, 0.3, 1);
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+	--spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Only the tokens change in dark mode — no component rule is duplicated. */
@@ -87,12 +129,16 @@
 		--ink-soft: #b4b3a2;
 		--ink-faint: #8d8c7c;
 		--accent-ink: #f0c242;
+		--accent-soft: #33280f;
 		--danger: #e2687c;
 		--danger-soft: #3a1b22;
 		--ok: #6ed69b;
 		--ok-soft: #14301f;
+		--warn: #f0c242;
+		--warn-soft: #33280f;
 		--shadow: 0 10px 30px rgb(0 0 0 / 45%);
 		--shadow-sm: 0 2px 8px rgb(0 0 0 / 35%);
+		--shadow-lift: 0 18px 44px rgb(0 0 0 / 55%);
 	}
 }
 
@@ -108,12 +154,16 @@
 	--ink-soft: #b4b3a2;
 	--ink-faint: #8d8c7c;
 	--accent-ink: #f0c242;
+	--accent-soft: #33280f;
 	--danger: #e2687c;
 	--danger-soft: #3a1b22;
 	--ok: #6ed69b;
 	--ok-soft: #14301f;
+	--warn: #f0c242;
+	--warn-soft: #33280f;
 	--shadow: 0 10px 30px rgb(0 0 0 / 45%);
 	--shadow-sm: 0 2px 8px rgb(0 0 0 / 35%);
+	--shadow-lift: 0 18px 44px rgb(0 0 0 / 55%);
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────────── */
@@ -131,13 +181,28 @@ body {
 	line-height: 1.5;
 	color: var(--ink);
 	background: var(--field);
-	/* The chalk yard-lines that give the page its identity. */
-	background-image: repeating-linear-gradient(
-		to bottom,
-		transparent 0 78px,
-		rgb(255 255 255 / 4%) 78px 79px
-	);
 	-webkit-text-size-adjust: 100%;
+}
+
+/* The playing surface: a coach's chalk playbook over the green ground. Fixed
+   rather than scrolling, so the cards slide across the diagram instead of
+   dragging it along — parallax for one pseudo-element and no JavaScript.
+
+   The diagram is a real SVG of X's, O's, routes and blocking assignments
+   (static/playbook.svg), not a generated stripe pattern. */
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background-image:
+		url('/playbook.svg'),
+		/* mown stripes, barely there — the ground under the chalk */
+			repeating-linear-gradient(90deg, rgb(255 255 255 / 1.5%) 0 110px, transparent 110px 220px),
+		radial-gradient(ellipse 120% 80% at 50% 0%, rgb(46 107 69 / 26%), transparent 70%);
+	background-size: 480px 480px, auto, auto;
+	background-repeat: repeat, repeat, no-repeat;
 }
 
 h1,
@@ -172,17 +237,6 @@ img {
 	border-radius: var(--r-sm);
 }
 
-@media (prefers-reduced-motion: reduce) {
-	*,
-	*::before,
-	*::after {
-		animation-duration: 0.01ms !important;
-		animation-iteration-count: 1 !important;
-		transition-duration: 0.01ms !important;
-		scroll-behavior: auto !important;
-	}
-}
-
 /* ── Layout ────────────────────────────────────────────────────────────── */
 
 .shell {
@@ -198,6 +252,7 @@ img {
 }
 
 .card {
+	position: relative;
 	background: var(--surface);
 	border-radius: var(--r-lg);
 	box-shadow: var(--shadow);
@@ -205,9 +260,25 @@ img {
 	margin-bottom: var(--s-4);
 }
 
+/* A hairline of gold along the top edge, the way a scoreboard panel is capped.
+   Drawn as a pseudo-element so it follows the radius. */
+.card::before {
+	content: '';
+	position: absolute;
+	inset: 0 0 auto;
+	height: 3px;
+	border-radius: var(--r-lg) var(--r-lg) 0 0;
+	background: linear-gradient(90deg, transparent, var(--gold) 20%, var(--gold-bright) 50%, var(--gold) 80%, transparent);
+	opacity: 0.85;
+}
+
+.card--plain::before {
+	display: none;
+}
+
 .section {
 	padding: var(--s-5) 0;
-	border-top: 1px solid var(--border);
+	border-top: 1px dashed var(--border);
 }
 
 .section:first-child {
@@ -230,17 +301,45 @@ img {
 
 /* ── Typography ────────────────────────────────────────────────────────── */
 
-.down-tag {
-	font-size: var(--t-xs);
-	font-weight: 800;
-	letter-spacing: 0.14em;
+.display {
+	font-family: var(--font-display);
 	text-transform: uppercase;
-	color: var(--accent-ink);
+	letter-spacing: 0.01em;
+	line-height: 1.02;
+}
+
+.mono {
+	font-family: var(--font-mono);
+}
+
+/* The down marker. A solid chip on turf with gold mono lettering — the single
+   most recognisable piece of the original, and the last thing that should have
+   been flattened into coloured text. */
+.down-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px var(--s-2);
+	border-radius: 5px;
+	background: var(--turf-mid);
+	color: var(--gold-bright);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
 	margin-bottom: var(--s-2);
+	white-space: nowrap;
 }
 
 .down-tag.red {
-	color: var(--danger);
+	background: var(--endzone);
+	color: #fff;
+}
+
+.down-tag.gold {
+	background: var(--gold);
+	color: #2a1e00;
 }
 
 .q-text {
@@ -264,53 +363,237 @@ img {
 	font-size: var(--t-sm);
 }
 
+.nums {
+	font-variant-numeric: tabular-nums;
+}
+
 /* ── Banner ────────────────────────────────────────────────────────────── */
 
+/* CHROME. The banner and footer are navy — the crest's own ground — so the
+   logo has something to sit on that belongs to it. Everything between them is
+   the green field. The gold rule is the seam where the two meet. */
 .banner {
-	text-align: center;
-	padding: var(--s-6) var(--s-4) var(--s-5);
+	position: relative;
+	overflow: hidden;
+	padding: var(--s-5) var(--s-4) var(--s-6);
 	color: var(--on-field);
+	background: linear-gradient(180deg, var(--navy-light), var(--navy) 55%, var(--navy-deep));
+	border-bottom: 4px solid var(--gold);
+}
+
+/* Stadium-seat texture: a fine grid, the way a crowd reads from distance. */
+.banner::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background-image:
+		repeating-linear-gradient(90deg, rgb(255 255 255 / 4%) 0 2px, transparent 2px 46px),
+		repeating-linear-gradient(180deg, rgb(255 255 255 / 2.5%) 0 1px, transparent 1px 22px);
+}
+
+/* A slow gold sweep, like stadium light travelling across the wall. */
+.banner::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: linear-gradient(100deg, transparent 35%, rgb(240 194 66 / 7%) 50%, transparent 65%);
+	background-size: 300% 100%;
+	animation: sweep 9s var(--ease) infinite;
+}
+
+.banner-inner {
+	position: relative;
+	max-width: 680px;
+	margin: 0 auto;
+}
+
+.eyebrow-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--s-2);
+	flex-wrap: wrap;
+	margin-bottom: var(--s-3);
+}
+
+.league-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--s-2);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.18em;
+	color: var(--gold-bright);
+	white-space: nowrap;
+}
+
+/* The live dot. Slow, not a strobe. */
+.league-tag::before {
+	content: '';
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--gold-bright);
+	box-shadow: 0 0 0 0 rgb(240 194 66 / 60%);
+	animation: pulse 2.6s var(--ease) infinite;
+}
+
+/* The crest and the wordmark share a line: badge left, name right, the way a
+   programme cover sets them. */
+.banner-head {
+	display: flex;
+	align-items: center;
+	gap: var(--s-4);
+}
+
+.crest {
+	flex: 0 0 auto;
+	width: clamp(56px, 14vw, 84px);
+	height: auto;
+	filter: drop-shadow(0 3px 8px rgb(0 0 0 / 50%));
+}
+
+/* The hub gets a bigger one, centred, as the page's opening statement. */
+.crest--hero {
+	display: block;
+	width: clamp(120px, 34vw, 168px);
+	margin: 0 auto var(--s-3);
 }
 
 .banner h1 {
 	font-family: var(--font-display);
-	font-size: clamp(26px, 7vw, 40px);
-	letter-spacing: -0.01em;
+	text-transform: uppercase;
+	font-size: clamp(26px, 7.6vw, 44px);
+	line-height: 1.02;
+	letter-spacing: 0.005em;
+	text-wrap: balance;
+	text-shadow: 0 2px 0 rgb(0 0 0 / 25%);
 }
 
 .banner .sub {
 	color: var(--on-field-dim);
 	font-size: var(--t-sm);
 	margin-top: var(--s-2);
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
+	max-width: 46ch;
+	/* Two lines reserved. The rotating one-liners differ in length, and
+	   without this the whole banner steps up and down every seven seconds. */
+	min-height: 3em;
+	/* Keeps the line clear of the corner stamp, which is absolutely positioned
+	   over this same corner. */
+	padding-right: 100px;
+	opacity: 0.88;
 }
 
 .nav {
 	display: flex;
-	justify-content: center;
 	flex-wrap: wrap;
-	gap: var(--s-2);
-	margin-top: var(--s-4);
+	gap: 7px;
 }
 
 .nav a {
 	display: inline-flex;
 	align-items: center;
-	min-height: 36px;
+	min-height: 34px;
 	padding: 0 var(--s-3);
 	border-radius: var(--r-pill);
-	border: 1px solid rgb(244 239 226 / 30%);
+	border: 1px solid rgb(240 194 66 / 45%);
 	color: var(--on-field-dim);
-	font-size: var(--t-sm);
-	font-weight: 600;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	letter-spacing: 0.08em;
+	font-weight: 700;
+	text-transform: uppercase;
 	text-decoration: none;
+	white-space: nowrap;
+	transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease),
+		background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
 }
 
 .nav a[aria-current='page'] {
-	background: var(--on-field);
-	color: var(--turf-dark);
-	border-color: var(--on-field);
+	background: rgb(240 194 66 / 16%);
+	border-color: var(--gold-bright);
+	color: var(--gold-bright);
+}
+
+@media (hover: hover) {
+	.nav a:hover {
+		border-color: var(--gold-bright);
+		color: var(--gold-bright);
+		transform: translateY(-1px);
+	}
+}
+
+/* ── Footer chrome ─────────────────────────────────────────────────────── */
+
+/* The other half of the navy sandwich. Sits at the bottom of the field the
+   way the banner sits at the top, so the green never runs off the page. */
+.site-foot {
+	margin-top: var(--s-7);
+	padding: var(--s-5) var(--s-4) var(--s-6);
+	background: linear-gradient(180deg, var(--navy), var(--navy-deep));
+	border-top: 4px solid var(--gold);
+	color: var(--on-field-dim);
+	text-align: center;
+}
+
+.site-foot-inner {
+	max-width: 680px;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--s-2);
+}
+
+.site-foot p {
+	font-size: var(--t-xs);
+	opacity: 0.7;
+}
+
+/* ── The stamp ─────────────────────────────────────────────────────────── */
+
+/* Themed rather than pinned to raw --endzone: the success stamp is real,
+   announced content on a card that goes dark, and #a32638 on a dark surface
+   is about 3.4:1. --danger brightens where it has to. */
+.stamp {
+	display: inline-block;
+	border: 2.5px solid var(--danger);
+	border-radius: 6px;
+	padding: 6px var(--s-2);
+	color: var(--danger);
+	background: rgb(255 255 255 / 4%);
+	font-family: var(--font-mono);
+	font-size: 10px;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	line-height: 1.25;
+	text-align: center;
+	white-space: pre-line;
+	transform: rotate(-8deg);
+	pointer-events: none;
+}
+
+.stamp--corner {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+}
+
+.stamp--big {
+	border-width: 4px;
+	border-radius: 10px;
+	padding: var(--s-3) var(--s-5);
+	font-size: 15px;
+	letter-spacing: 0.1em;
+	transform: rotate(-6deg);
+}
+
+/* The slam. Comes in oversized and off-axis, lands hard, settles. */
+.stamp--slam {
+	animation: slam var(--dur-4) var(--ease-out) both;
 }
 
 /* ── Controls ──────────────────────────────────────────────────────────── */
@@ -322,24 +605,40 @@ img {
 	min-height: var(--tap);
 	min-width: var(--tap);
 	padding: 0 var(--s-4);
-	border-radius: var(--r-pill);
+	border-radius: var(--r-md);
 	border: 2px solid var(--border-strong);
 	background: var(--surface-2);
 	color: var(--ink);
-	font-weight: 700;
+	font-weight: 800;
 	cursor: pointer;
-	transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+	transition: transform var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease),
+		background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+		box-shadow var(--dur-1) var(--ease);
 }
 
 .chip[aria-pressed='true'] {
 	border-color: var(--gold);
 	background: var(--gold);
 	color: #2a1e00;
+	box-shadow: 0 0 0 4px rgb(212 160 23 / 18%);
+}
+
+.chip--sm {
+	min-height: 36px;
+	padding: 0 var(--s-3);
+	border-width: 1.5px;
+	border-radius: var(--r-pill);
+	font-size: var(--t-sm);
+	font-weight: 700;
 }
 
 .chip:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
+}
+
+.chip:active:not(:disabled) {
+	transform: scale(0.97);
 }
 
 @media (hover: hover) {
@@ -349,6 +648,8 @@ img {
 	}
 }
 
+/* Buttons sit on a coloured plinth and drop onto it when pressed. This is the
+   single detail that made the original feel physical. */
 .btn {
 	display: inline-flex;
 	align-items: center;
@@ -361,30 +662,88 @@ img {
 	background: var(--turf-mid);
 	color: var(--chalk);
 	font-weight: 800;
+	letter-spacing: 0.02em;
 	cursor: pointer;
+	box-shadow: 0 4px 0 var(--press-turf);
+	transition: transform var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease),
+		filter var(--dur-1) var(--ease);
+}
+
+.btn:active:not(:disabled) {
+	transform: translateY(3px);
+	box-shadow: 0 1px 0 var(--press-turf);
+}
+
+@media (hover: hover) {
+	.btn:hover:not(:disabled) {
+		filter: brightness(1.08);
+	}
 }
 
 .btn--primary {
+	width: 100%;
 	background: var(--gold);
 	color: #2a1e00;
-	width: 100%;
+	font-family: var(--font-display);
+	text-transform: uppercase;
 	font-size: var(--t-md);
+	letter-spacing: 0.03em;
+	box-shadow: 0 5px 0 var(--press-gold);
+}
+
+.btn--primary:active:not(:disabled) {
+	box-shadow: 0 2px 0 var(--press-gold);
 }
 
 .btn--danger {
-	background: var(--danger);
+	background: var(--endzone);
 	color: #fff;
+	box-shadow: 0 4px 0 var(--press-danger);
+}
+
+.btn--danger:active:not(:disabled) {
+	box-shadow: 0 1px 0 var(--press-danger);
 }
 
 .btn--ghost {
 	background: transparent;
-	border: 1px solid var(--border-strong);
+	border: 1.5px solid var(--border-strong);
 	color: var(--ink);
+	font-weight: 700;
+	box-shadow: none;
+}
+
+.btn--ghost:active:not(:disabled) {
+	transform: scale(0.98);
+	box-shadow: none;
+}
+
+@media (hover: hover) {
+	.btn--ghost:hover:not(:disabled) {
+		border-color: var(--gold);
+		filter: none;
+	}
+}
+
+.btn--sm {
+	min-height: 38px;
+	padding: 0 var(--s-3);
+	font-size: var(--t-sm);
+	border-radius: var(--r-sm);
 }
 
 .btn:disabled {
-	opacity: 0.45;
+	background: var(--surface-3);
+	color: var(--ink-faint);
+	box-shadow: 0 4px 0 var(--press-flat);
 	cursor: not-allowed;
+	transform: none;
+}
+
+.btn--ghost:disabled {
+	background: transparent;
+	box-shadow: none;
+	opacity: 0.45;
 }
 
 input[type='text'],
@@ -398,8 +757,17 @@ select {
 	color: var(--ink);
 	padding: var(--s-3);
 	border-radius: var(--r-sm);
-	border: 1px solid var(--border-strong);
+	border: 1.5px solid var(--border-strong);
 	background: var(--surface-2);
+	transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+input[type='text']:focus,
+input[type='number']:focus,
+textarea:focus,
+select:focus {
+	border-color: var(--gold);
+	box-shadow: 0 0 0 3px rgb(212 160 23 / 18%);
 }
 
 textarea {
@@ -430,14 +798,25 @@ legend {
 .badge {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--s-1);
-	padding: 3px var(--s-2);
+	gap: 5px;
+	padding: 4px var(--s-2);
 	border-radius: var(--r-pill);
-	font-size: var(--t-xs);
+	font-family: var(--font-mono);
+	font-size: 10px;
 	font-weight: 800;
-	letter-spacing: 0.06em;
+	letter-spacing: 0.1em;
 	text-transform: uppercase;
+	white-space: nowrap;
 	border: 1px solid transparent;
+}
+
+.badge::before {
+	content: '';
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: currentcolor;
+	flex: 0 0 auto;
 }
 
 .badge--open {
@@ -446,17 +825,32 @@ legend {
 	border-color: currentcolor;
 }
 
+.badge--open::before {
+	animation: pulse 2.6s var(--ease) infinite;
+}
+
 .badge--closed {
 	background: var(--danger-soft);
 	color: var(--danger);
 	border-color: currentcolor;
 }
 
-.badge--draft,
+.badge--draft {
+	background: var(--warn-soft);
+	color: var(--warn);
+	border-color: currentcolor;
+}
+
 .badge--archived {
 	background: var(--surface-3);
 	color: var(--ink-soft);
 	border-color: var(--border-strong);
+}
+
+.badge--board {
+	background: var(--accent-soft);
+	color: var(--accent-ink);
+	border-color: currentcolor;
 }
 
 /* ── Notices ───────────────────────────────────────────────────────────── */
@@ -468,12 +862,14 @@ legend {
 	background: var(--surface-3);
 	font-size: var(--t-sm);
 	margin-bottom: var(--s-4);
+	animation: nag var(--dur-3) var(--ease) both;
 }
 
 .notice--danger {
 	border-left-color: var(--danger);
 	background: var(--danger-soft);
 	color: var(--danger);
+	font-weight: 600;
 }
 
 .notice--ok {
@@ -485,6 +881,7 @@ legend {
 /* ── Progress ──────────────────────────────────────────────────────────── */
 
 .meter {
+	position: relative;
 	height: 8px;
 	border-radius: var(--r-pill);
 	background: var(--surface-3);
@@ -494,8 +891,126 @@ legend {
 .meter > i {
 	display: block;
 	height: 100%;
-	background: var(--gold);
-	transition: width 0.25s ease;
+	border-radius: inherit;
+	background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+	transition: width var(--dur-3) var(--ease-out);
+}
+
+/* A one-pass shine along a filled meter, so a board feels live rather than
+   printed. Only on meters that carry the modifier. */
+.meter--live > i::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(90deg, transparent, rgb(255 255 255 / 45%), transparent);
+	background-size: 40% 100%;
+	background-repeat: no-repeat;
+	animation: shine 2.4s var(--ease) infinite;
+}
+
+/* ── Stat tiles ────────────────────────────────────────────────────────── */
+
+.kv-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: var(--s-3);
+}
+
+.kv {
+	position: relative;
+	overflow: hidden;
+	padding: var(--s-4) var(--s-3);
+	border-radius: var(--r-md);
+	border: 1px solid var(--border);
+	background: var(--surface-2);
+	text-align: center;
+}
+
+/* --ok and --accent-ink rather than --turf-line and --gold: both of those are
+   fixed values that sit at roughly 2.3:1 and 2.4:1 on a pale card, which even
+   display-sized text does not get away with. These two flip per theme. */
+/* A small mark above the number, so a grid of tiles is scannable by shape
+   before you have read a single label. */
+.kv-i {
+	display: block;
+	margin-bottom: var(--s-2);
+	color: var(--ink-faint);
+}
+
+.kv-v {
+	display: block;
+	font-family: var(--font-display);
+	font-size: var(--t-xl);
+	line-height: 1;
+	color: var(--ok);
+	font-variant-numeric: tabular-nums;
+}
+
+.kv-v.gold {
+	color: var(--accent-ink);
+}
+
+.kv-v.danger {
+	color: var(--danger);
+}
+
+/* A long value — a date range, a buy-in label — needs a smaller face than a
+   count does, or it wraps into three lines. */
+.kv-v.sm {
+	font-size: var(--t-md);
+	line-height: 1.2;
+}
+
+.kv-k {
+	display: block;
+	margin-top: var(--s-2);
+	font-size: 10.5px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+
+/* ── Sticky save bar ───────────────────────────────────────────────────── */
+
+.savebar {
+	position: sticky;
+	bottom: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	gap: var(--s-3);
+	margin: var(--s-4) calc(var(--s-5) * -1) calc(var(--s-5) * -1);
+	padding: var(--s-3) var(--s-5) calc(var(--s-3) + env(safe-area-inset-bottom));
+	border-top: 2px solid var(--gold);
+	border-radius: 0 0 var(--r-lg) var(--r-lg);
+	background: var(--surface);
+	box-shadow: 0 -6px 24px rgb(10 20 12 / 12%);
+}
+
+.savebar-txt {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--t-sm);
+	font-weight: 700;
+	color: var(--ink-soft);
+}
+
+.savebar .btn {
+	flex: 0 0 auto;
+	width: auto;
+}
+
+@media (max-width: 480px) {
+	.savebar {
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--s-2);
+	}
+
+	.savebar .btn {
+		width: 100%;
+	}
 }
 
 /* ── Tables that must not break the page ───────────────────────────────── */
@@ -503,6 +1018,239 @@ legend {
 .scroll-x {
 	overflow-x: auto;
 	-webkit-overflow-scrolling: touch;
+}
+
+/* ── Motion utilities ──────────────────────────────────────────────────── */
+
+/* Scroll reveal. The attribute is written by the `reveal` action at runtime,
+   never by the server — so with JavaScript off nothing is ever hidden. */
+[data-reveal='pending'] {
+	opacity: 0;
+	transform: translateY(14px);
+}
+
+[data-reveal='in'] {
+	animation: rise var(--dur-3) var(--ease-out) both;
+	animation-delay: var(--reveal-delay, 0ms);
+}
+
+.pop {
+	animation: pop var(--dur-2) var(--ease) both;
+}
+
+.shake {
+	animation: shake 0.42s ease both;
+}
+
+/* ── Icon states ───────────────────────────────────────────────────────── */
+
+/* The ball spins while a response is in flight. */
+.icon--spin {
+	animation: spin 900ms linear infinite;
+	transform-origin: 50% 50%;
+}
+
+/* The flag comes in the way a flag comes in: thrown, then it lands. */
+.icon--drop {
+	animation: flagdrop 560ms var(--spring) both;
+	transform-origin: 20% 90%;
+}
+
+/* The chain gang moves the marker up as you clear each section. */
+.icon--advance {
+	animation: advance var(--dur-3) var(--ease-out) both;
+}
+
+/* One short blast, on a ruling. */
+.icon--blow {
+	animation: blow 620ms var(--ease) both;
+	transform-origin: 38% 58%;
+}
+
+/* ── Keyframes ─────────────────────────────────────────────────────────── */
+
+@keyframes rise {
+	from {
+		opacity: 0;
+		transform: translateY(14px);
+	}
+
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes nag {
+	from {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes pop {
+	0% {
+		transform: scale(1);
+	}
+
+	45% {
+		transform: scale(1.04);
+	}
+
+	100% {
+		transform: scale(1);
+	}
+}
+
+@keyframes slam {
+	0% {
+		opacity: 0;
+		transform: rotate(-26deg) scale(2.6);
+	}
+
+	55% {
+		opacity: 1;
+		transform: rotate(-4deg) scale(0.94);
+	}
+
+	72% {
+		transform: rotate(-7.5deg) scale(1.03);
+	}
+
+	100% {
+		opacity: 1;
+		transform: rotate(-6deg) scale(1);
+	}
+}
+
+@keyframes shake {
+	0%,
+	100% {
+		transform: translateX(0);
+	}
+
+	20% {
+		transform: translateX(-9px);
+	}
+
+	40% {
+		transform: translateX(8px);
+	}
+
+	60% {
+		transform: translateX(-6px);
+	}
+
+	80% {
+		transform: translateX(4px);
+	}
+}
+
+@keyframes pulse {
+	0% {
+		box-shadow: 0 0 0 0 currentcolor;
+		opacity: 1;
+	}
+
+	70% {
+		box-shadow: 0 0 0 7px transparent;
+		opacity: 0.75;
+	}
+
+	100% {
+		box-shadow: 0 0 0 0 transparent;
+		opacity: 1;
+	}
+}
+
+@keyframes sweep {
+	0%,
+	100% {
+		background-position: 140% 0;
+	}
+
+	50% {
+		background-position: -40% 0;
+	}
+}
+
+@keyframes shine {
+	from {
+		background-position: -60% 0;
+	}
+
+	to {
+		background-position: 160% 0;
+	}
+}
+
+@keyframes fade {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes flagdrop {
+	0% {
+		opacity: 0;
+		transform: translateY(-16px) rotate(-38deg);
+	}
+
+	60% {
+		opacity: 1;
+		transform: translateY(2px) rotate(6deg);
+	}
+
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes advance {
+	from {
+		opacity: 0;
+		transform: translateX(-10px);
+	}
+
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes blow {
+	0%,
+	100% {
+		transform: rotate(0) scale(1);
+	}
+
+	18% {
+		transform: rotate(-12deg) scale(1.16);
+	}
+
+	42% {
+		transform: rotate(8deg) scale(1.08);
+	}
+
+	68% {
+		transform: rotate(-4deg) scale(1.12);
+	}
 }
 
 /* ── Screen-reader helpers ─────────────────────────────────────────────── */
@@ -545,4 +1293,25 @@ legend {
 	background: var(--chalk);
 	color: var(--turf-dark);
 	font-size: var(--t-sm);
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+
+/* Last in the file so it beats every animation declared above. Reveals must
+   also be *shown*, not merely un-animated — otherwise the opt-out hides the
+   page. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+
+	[data-reveal='pending'] {
+		opacity: 1;
+		transform: none;
+	}
 }
