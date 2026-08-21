@@ -4,7 +4,7 @@
 	import { fieldStatus } from '$lib/negotiation';
 	import { countdown } from '$lib/draft';
 	import { countUp, flash } from '$lib/motion';
-	import { DRAFT, EMPTY, burgerRoast, roast, lastPlaceNote } from '$lib/voice';
+	import { DRAFT, EMPTY, PAID_UP, burgerRoast, duesRoast, lastPlaceNote } from '$lib/voice';
 	import Icon from '$lib/components/Icon.svelte';
 
 	let { data } = $props();
@@ -39,9 +39,6 @@
 		return { pairs: data.pairings.length, settled, total };
 	});
 
-	// Counted on the server now. The browser is handed the bars, not fourteen
-	// people's raw answers.
-	let pot = $derived(data.kind === 'pot' ? data.pot : null);
 
 	/* ── The two clocks ───────────────────────────────────────────────────── */
 
@@ -68,8 +65,8 @@
 
 	/* ── The naming and shaming ───────────────────────────────────────────── */
 
-	let missingRoast = $derived(
-		data.kind === 'pot' ? roast(data.missing, data.roster.length) : null
+	let unpaid = $derived(
+		data.kind === 'pot' ? duesRoast(data.owing.map((p) => p.name), data.roster.length) : null
 	);
 
 	let burger = $derived(
@@ -97,7 +94,9 @@
 		if (rivalrySummary && rivalrySummary.total) {
 			return `${data.board.og.title} — ${rivalrySummary.settled}/${rivalrySummary.total} settled`;
 		}
-		if (pot) return `${data.board.og.title} — $${pot.projected.toLocaleString()} on the line`;
+		if (data.kind === 'pot' && data.pot) {
+			return `${data.board.og.title} — $${data.pot.toLocaleString()} on the line`;
+		}
 		if (data.kind === 'draft' && data.daysOut !== null) {
 			return data.daysOut === 0
 				? `${data.board.og.title} — today`
@@ -108,10 +107,6 @@
 
 	let ogDescription = $derived(data.board.og.description);
 	let ogImage = $derived(`${page.url.origin}/og/board.png`);
-
-	function money(p: number, of: number): string {
-		return `$${Math.round((of * p) / 100).toLocaleString()}`;
-	}
 
 	const dollars = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
@@ -156,8 +151,8 @@
 			</button>
 		</div>
 
-		{#if missingRoast}
-			<p class="roast">{missingRoast}</p>
+		{#if data.kind === 'pot'}
+			<p class="roast">{unpaid ?? PAID_UP}</p>
 		{/if}
 
 		{#if data.kind === 'rivalry'}
@@ -369,65 +364,74 @@
 			{#if data.fetchedAt}
 				<p class="faint">Draft time last read from Sleeper {data.fetchedAt}.</p>
 			{/if}
-		{:else if pot}
-			<div class="kv-grid">
-				<div class="kv">
-					<span class="kv-i"><Icon name="clipboard" size={17} /></span>
-					<span class="kv-v sm">{pot.winner.label}</span>
-					<!-- .kv-k uppercases in CSS, so these labels stay lower case in the
-					     source — which is also what the end-to-end tests read. -->
-					<span class="kv-k">winning buy-in</span>
-				</div>
-				<div class="kv">
-					<span class="kv-i"><Icon name="trophy" size={17} /></span>
-					<span class="kv-v nums gold" use:countUp={{ value: pot.projected, format: dollars }}
-						>{dollars(pot.projected)}</span
-					>
-					<span class="kv-k">pot if everyone's in</span>
-				</div>
-				<div class="kv">
-					<span class="kv-i"><Icon name="football" size={17} /></span>
-					<span class="kv-v nums" use:countUp={{ value: pot.collected, format: dollars }}
-						>{dollars(pot.collected)}</span
-					>
-					<span class="kv-k">from the {data.kind === 'pot' ? data.answered : 0} who answered</span>
-				</div>
-			</div>
-
-			<h3 class="rail">The vote</h3>
-			{#each pot.rows as r (r.id)}
-				<div class="bar">
-					<span>{r.label}</span>
-					<div class="meter meter--live"><i style="width:{r.pct}%"></i></div>
-					<span class="faint nums">{r.n} votes</span>
-				</div>
-			{/each}
-
-			{#if pot.split && pot.split.respondents}
-				<h3 class="rail">The split</h3>
-				{#each pot.split.buckets as b (b.label)}
-					<div class="bar">
-						<span>{b.label}</span>
-						<div class="meter"><i style="width:{b.pct}%"></i></div>
-						<span class="faint nums">{b.pct}% · {money(b.pct, pot.projected)}</span>
-					</div>
-				{/each}
-				{#if pot.split.carveOut}
-					<div class="bar">
-						<span>{pot.split.carveOut.label}</span>
-						<div class="meter"><i style="width:{pot.split.carveOut.pct}%"></i></div>
-						<span class="faint nums"
-							>{pot.split.carveOut.pct}% · {money(pot.split.carveOut.pct, pot.projected)}</span
-						>
-					</div>
-				{/if}
-			{/if}
 		{:else if data.kind === 'pot'}
-			<!-- No buy-in votes yet, so there is no pot to publish. This used to
-			     fall through to a full tally of the intake survey — every
-			     punishment write-in, availability grid and beef ranking, on a
-			     public page. The Desk is where that lives. -->
-			<p class="empty">{EMPTY.noResponses}</p>
+			{#if !data.buyIn}
+				<p class="empty">{EMPTY.noBuyIn}</p>
+			{:else}
+				<div class="kv-grid">
+					<div class="kv">
+						<span class="kv-i"><Icon name="clipboard" size={17} /></span>
+						<!-- .kv-k uppercases in CSS, so these labels stay lower case in
+						     the source — which is also what the end-to-end tests read. -->
+						<span class="kv-v nums">{dollars(data.buyIn)}</span>
+						<span class="kv-k">buy-in</span>
+					</div>
+					<div class="kv">
+						<span class="kv-i"><Icon name="trophy" size={17} /></span>
+						<span class="kv-v nums gold" use:countUp={{ value: data.pot, format: dollars }}
+							>{dollars(data.pot)}</span
+						>
+						<span class="kv-k">the pot · {data.roster.length} in</span>
+					</div>
+					<div class="kv">
+						<span class="kv-i"><Icon name="football" size={17} /></span>
+						<span
+							class="kv-v nums"
+							class:danger={data.collected < data.pot}
+							use:countUp={{ value: data.collected, format: dollars }}>{dollars(data.collected)}</span
+						>
+						<span class="kv-k">collected so far</span>
+					</div>
+				</div>
+
+				<!-- ── The split ──────────────────────────────────────────────── -->
+				<h3 class="rail">The split · where {dollars(data.pot)} lands</h3>
+
+				{#if data.payouts.length === 0}
+					<p class="empty">{EMPTY.noSplit}</p>
+				{:else}
+					<ol class="cuts">
+						{#each data.payouts as cut, i (cut.label)}
+							<li class="cut" class:cut--first={i === 0}>
+								<span class="cut-label">{cut.label}</span>
+								<div class="meter" aria-hidden="true"><i style="width:{cut.pct}%"></i></div>
+								<span class="cut-pct faint nums">{cut.pct}%</span>
+								<span class="cut-amount nums">{dollars(cut.amount)}</span>
+							</li>
+						{/each}
+					</ol>
+				{/if}
+
+				<!-- ── Who has paid ───────────────────────────────────────────── -->
+				<h3 class="rail">Who has paid</h3>
+
+				<div class="ledger">
+					{#each data.paid as r (r.playerId)}
+						<div class="payer payer--paid">
+							<span class="tick" aria-hidden="true">✓</span>
+							<span class="payer-name">{r.name}</span>
+							<span class="payer-state nums">paid</span>
+						</div>
+					{/each}
+					{#each data.owing as r (r.playerId)}
+						<div class="payer payer--owing">
+							<span class="tick" aria-hidden="true">✗</span>
+							<span class="payer-name">{r.name}</span>
+							<span class="payer-state nums">owes {dollars(data.buyIn)}</span>
+						</div>
+					{/each}
+				</div>
+			{/if}
 		{/if}
 	</section>
 </div>
@@ -752,6 +756,137 @@
 		}
 	}
 
+	/* ── The Pot ───────────────────────────────────────────────────────────
+	   The split reads as a table of money, not a chart: label, bar, percent,
+	   dollars. The dollars are the column people actually came for, so they sit
+	   last and hard right where the eye lands. */
+	.cuts {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.cut {
+		display: grid;
+		grid-template-columns: minmax(90px, 170px) minmax(0, 1fr) 46px 84px;
+		gap: var(--s-3);
+		align-items: center;
+		padding: var(--s-2) 0;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.cut:last-child {
+		border-bottom: 0;
+	}
+
+	.cut-label {
+		font-weight: 700;
+		overflow-wrap: anywhere;
+	}
+
+	.cut--first .cut-label,
+	.cut--first .cut-amount {
+		font-family: var(--font-display);
+		text-transform: uppercase;
+		letter-spacing: 0.01em;
+	}
+
+	.cut-pct {
+		text-align: right;
+	}
+
+	.cut-amount {
+		text-align: right;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+		color: var(--accent-ink);
+	}
+
+	@media (max-width: 560px) {
+		.cut {
+			grid-template-columns: minmax(0, 1fr) 46px 84px;
+		}
+
+		.cut-label {
+			grid-area: 1 / 1;
+		}
+
+		.cut-pct {
+			grid-area: 1 / 2;
+		}
+
+		.cut-amount {
+			grid-area: 1 / 3;
+		}
+
+		.cut .meter {
+			grid-area: 2 / 1 / 2 / -1;
+		}
+	}
+
+	/* The ledger. Paid and unpaid are the same row shape — only the spine
+	   colour and the tick change — so it scans as one list rather than two
+	   lists that happen to be adjacent. */
+	.ledger {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+		gap: var(--s-2);
+	}
+
+	.payer {
+		display: grid;
+		grid-template-columns: 20px minmax(0, 1fr) auto;
+		gap: var(--s-3);
+		align-items: baseline;
+		padding: var(--s-2) var(--s-3);
+		border-radius: var(--r-sm);
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+	}
+
+	.payer--paid {
+		box-shadow: inset 3px 0 0 var(--ok);
+	}
+
+	.payer--owing {
+		box-shadow: inset 3px 0 0 var(--danger);
+		background: var(--danger-soft);
+	}
+
+	.tick {
+		font-weight: 900;
+		line-height: 1;
+	}
+
+	.payer--paid .tick {
+		color: var(--ok);
+	}
+
+	.payer--owing .tick {
+		color: var(--danger);
+	}
+
+	.payer-name {
+		font-weight: 700;
+		overflow-wrap: anywhere;
+	}
+
+	.payer-state {
+		font-family: var(--font-mono);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	.payer--paid .payer-state {
+		color: var(--ok);
+	}
+
+	.payer--owing .payer-state {
+		color: var(--danger);
+	}
+
 	.waiting {
 		display: flex;
 		flex-wrap: wrap;
@@ -766,16 +901,6 @@
 	.waiting .chip {
 		cursor: default;
 		opacity: 0.75;
-	}
-
-	.rail {
-		margin: var(--s-5) 0 var(--s-3);
-		font-family: var(--font-mono);
-		font-size: 11px;
-		font-weight: 800;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--ink-soft);
 	}
 
 	.pairs {
@@ -871,28 +996,6 @@
 		}
 
 		.line .down-tag {
-			grid-column: 1 / -1;
-		}
-	}
-
-	/* Label first at a bounded width, then the meter takes the slack — the
-	   other way round leaves a short label stranded beside a tiny bar. */
-	.bar {
-		display: grid;
-		grid-template-columns: minmax(120px, 260px) minmax(0, 1fr) auto;
-		gap: var(--s-3);
-		align-items: center;
-		margin-bottom: var(--s-2);
-		font-size: var(--t-sm);
-		font-weight: 600;
-	}
-
-	@media (max-width: 560px) {
-		.bar {
-			grid-template-columns: minmax(0, 1fr) auto;
-		}
-
-		.bar .meter {
 			grid-column: 1 / -1;
 		}
 	}

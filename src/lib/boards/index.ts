@@ -51,11 +51,14 @@ export const BOARDS: BoardDefinition[] = [
 	{
 		id: 'pot',
 		title: 'The Pot',
-		from: 'intake',
-		blurb: 'The buy-in that won, the total pot, and the prize split in real dollars.',
+		// Set on the Desk, paid in Sleeper. The buy-in used to be presented as
+		// the option that WON a survey vote, with the bars beside it — a tally
+		// dressed up as a fact.
+		from: 'sleeper',
+		blurb: 'The buy-in, the pot, where it lands, and who has actually handed over money.',
 		og: {
 			title: 'The Pot',
-			description: 'The winning buy-in, the projected pot, and the crowdsourced prize split.'
+			description: 'The buy-in, the pot, the payout split in real dollars, and who still owes.'
 		}
 	},
 	{

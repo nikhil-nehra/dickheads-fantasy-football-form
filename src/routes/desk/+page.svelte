@@ -10,6 +10,7 @@
 	import type { NegotiationQuestion } from '$lib/surveys/types';
 	import { allQuestions } from '$lib/surveys/types';
 	import { reduced } from '$lib/motion';
+	import { MAX_SLICES, payouts } from '$lib/pot';
 	import Icon from '$lib/components/Icon.svelte';
 
 	let { data } = $props();
@@ -111,6 +112,64 @@
 		data.authed ? autoPair(data.players.map((p) => p.id), beef) : []
 	);
 
+	/* ── The pot ────────────────────────────────────────────────────────────
+	   The buy-in and the split used to be read out of the intake survey and
+	   printed on the board beside their vote counts. They are decisions, not
+	   tallies — the survey is how you make up your mind, this is where you say
+	   what you decided. */
+
+	let potBuyIn = $state(0);
+	let potSplit = $state<{ label: string; pct: number }[]>([]);
+	let potLoaded = $state(false);
+
+	// Seeded once from the loader, then owned by the form — reseeding on every
+	// invalidateAll would throw away whatever is half-typed.
+	$effect(() => {
+		if (!data.authed || potLoaded) return;
+		potBuyIn = data.pot.buyIn;
+		potSplit = data.pot.split.map((s) => ({ ...s }));
+		potLoaded = true;
+	});
+
+	let splitTotal = $derived(potSplit.reduce((a, b) => a + (Number(b.pct) || 0), 0));
+	let potSize = $derived(data.authed ? potBuyIn * data.players.length : 0);
+	let splitOk = $derived(potSplit.length === 0 || splitTotal === 100);
+
+	function addSlice() {
+		if (potSplit.length >= MAX_SLICES) return;
+		potSplit = [...potSplit, { label: `${potSplit.length + 1}th place`, pct: 0 }];
+	}
+
+	function removeSlice(i: number) {
+		potSplit = potSplit.filter((_, x) => x !== i);
+	}
+
+	/* Paid marks post one player at a time and re-load, so two devices marking
+	   two different people cannot revert each other. `marking` keeps the row
+	   that is in flight disabled without freezing the rest of the list. */
+	let marking = $state('');
+
+	let paidSet = $derived(new Set(data.authed ? data.paidIds : []));
+	let paidCount = $derived(paidSet.size);
+	let collected = $derived(paidCount * potBuyIn);
+
+	async function togglePaid(playerId: string, name: string, paid: boolean) {
+		marking = playerId;
+		try {
+			await post('/api/desk/payment', { playerId, paid }, `${name} ${paid ? 'paid' : 'unpaid'}`);
+		} finally {
+			marking = '';
+		}
+	}
+
+	function savePot() {
+		return post(
+			'/api/desk/pot',
+			{ buyIn: Number(potBuyIn) || 0, split: potSplit.map((s) => ({ ...s, pct: Number(s.pct) || 0 })) },
+			'pot saved'
+		);
+	}
+
 	function entriesFor(pairingId: string, playerId: string) {
 		if (!data.authed) return [];
 		return data.negotiation.filter(
@@ -211,6 +270,12 @@
 				aria-selected={tab === 'rivalries'}
 				class:on={tab === 'rivalries'}
 				onclick={() => (tab = 'rivalries')}>Rivalries</button
+			>
+			<button
+				role="tab"
+				aria-selected={tab === 'pot'}
+				class:on={tab === 'pot'}
+				onclick={() => (tab = 'pot')}>The Pot</button
 			>
 			<button
 				role="tab"
@@ -379,6 +444,139 @@
 					{/each}
 				{/if}
 			</section>
+		{:else if tab === 'pot'}
+			<section class="card">
+				<h2 class="display">The Pot</h2>
+				<p class="q-help">
+					The buy-in and the payout split, as decided. The intake survey is where people
+					<em>argued</em> about these; this is where you say what they came to. Both go straight
+					to <a href="/b/pot">The Pot board</a>, which publishes no survey answers at all.
+				</p>
+
+				<div class="pot-grid">
+					<label class="pot-field">
+						<span class="down-tag">Buy-in</span>
+						<span class="pot-input">
+							<span aria-hidden="true">$</span>
+							<input
+								type="number"
+								min="0"
+								step="1"
+								inputmode="numeric"
+								bind:value={potBuyIn}
+								aria-label="Buy-in in dollars"
+							/>
+						</span>
+						<span class="faint">per player</span>
+					</label>
+
+					<div class="pot-field">
+						<span class="down-tag gold">The pot</span>
+						<span class="pot-total nums">${potSize.toLocaleString()}</span>
+						<span class="faint">{data.players.length} players in</span>
+					</div>
+				</div>
+
+				<h3 class="rail">The split</h3>
+				<p class="q-help">
+					Percentages of the pot. They have to total exactly 100% — anything less quietly
+					publishes a pot that pays out less than it holds.
+				</p>
+
+				{#each potSplit as slice, i (i)}
+					<div class="slice">
+						<input
+							type="text"
+							maxlength="40"
+							bind:value={slice.label}
+							aria-label="Slice {i + 1} label"
+							placeholder="e.g. 1st place"
+						/>
+						<span class="pot-input pot-input--pct">
+							<input
+								type="number"
+								min="0"
+								max="100"
+								step="1"
+								inputmode="numeric"
+								bind:value={slice.pct}
+								aria-label="Slice {i + 1} percent"
+							/>
+							<span aria-hidden="true">%</span>
+						</span>
+						<span class="slice-amount nums"
+							>${Math.round((potSize * (Number(slice.pct) || 0)) / 100).toLocaleString()}</span
+						>
+						<button class="btn btn--ghost btn--sm" onclick={() => removeSlice(i)}>Remove</button>
+					</div>
+				{/each}
+
+				<div class="row">
+					<button class="btn btn--ghost btn--sm" onclick={addSlice} disabled={potSplit.length >= MAX_SLICES}
+						>Add a slice</button
+					>
+					<span class="faint nums" class:danger={!splitOk}>
+						{splitTotal}% of 100%
+					</span>
+				</div>
+
+				{#if !splitOk}
+					<p class="notice notice--danger">
+						The split totals {splitTotal}%. Fix it before saving — the board prints every figure as
+						a percentage of the pot.
+					</p>
+				{/if}
+
+				{#if splitOk && potSplit.length}
+					<h3 class="rail">What that pays</h3>
+					<ul class="preview">
+						{#each payouts(potSplit.map((x) => ({ label: x.label, pct: Number(x.pct) || 0 })), potSize) as cut (cut.label)}
+							<li><strong>{cut.label}</strong> — ${cut.amount.toLocaleString()}</li>
+						{/each}
+					</ul>
+				{/if}
+
+				<div class="row">
+					<button class="btn btn--primary" onclick={savePot} disabled={!splitOk || !!busy}>
+						{busy === 'pot saved' ? 'Saving…' : 'Save the pot'}
+					</button>
+				</div>
+			</section>
+
+			<section class="card">
+				<h2 class="display">Who has paid</h2>
+				<p class="q-help">
+					Tap a name to mark them paid. Each tap saves on its own, so you can do this from your
+					phone while somebody is handing you cash, and two people marking two different players
+					will not revert each other.
+				</p>
+
+				<p class="faint">
+					<strong class="nums">{paidCount}</strong> of {data.players.length} paid ·
+					<strong class="nums">${collected.toLocaleString()}</strong> of ${potSize.toLocaleString()}
+					in
+					{#if paidCount < data.players.length}
+						· <strong class="nums">${(potSize - collected).toLocaleString()}</strong> outstanding
+					{/if}
+				</p>
+
+				<div class="marks">
+					{#each data.players as p (p.id)}
+						{@const isPaid = paidSet.has(p.id)}
+						<button
+							class="mark"
+							class:mark--paid={isPaid}
+							aria-pressed={isPaid}
+							disabled={marking === p.id || !!busy}
+							onclick={() => togglePaid(p.id, p.display_name, !isPaid)}
+						>
+							<span class="mark-tick" aria-hidden="true">{isPaid ? '✓' : '✗'}</span>
+							<span class="mark-name">{p.display_name}</span>
+							<span class="mark-state">{isPaid ? 'paid' : 'owes'}</span>
+						</button>
+					{/each}
+				</div>
+			</section>
 		{:else if tab === 'sleeper'}
 			<section class="card">
 				<h2 class="display">Sleeper accounts</h2>
@@ -462,6 +660,183 @@
 </div>
 
 <style>
+	/* ── The Pot tab ───────────────────────────────────────────────────────── */
+
+	.pot-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+		gap: var(--s-3);
+		margin-bottom: var(--s-4);
+	}
+
+	.pot-field {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--s-1);
+		padding: var(--s-3) var(--s-4);
+		border-radius: var(--r-md);
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+	}
+
+	.pot-field .down-tag {
+		margin-bottom: var(--s-1);
+	}
+
+	/* The currency mark belongs to the field, not to the number — typing over a
+	   value should never mean re-typing a "$". */
+	.pot-input {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 2px;
+		font-family: var(--font-display);
+		font-size: var(--t-lg);
+	}
+
+	.pot-input input {
+		width: 6ch;
+		border: 0;
+		border-bottom: 2px solid var(--border-strong);
+		border-radius: 0;
+		background: transparent;
+		padding: 0 2px;
+		font: inherit;
+		color: inherit;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.pot-input input:focus-visible {
+		outline: none;
+		border-bottom-color: var(--accent-ink);
+	}
+
+	.pot-input--pct {
+		font-size: var(--t-base);
+	}
+
+	.pot-input--pct input {
+		width: 4ch;
+	}
+
+	.pot-total {
+		font-family: var(--font-display);
+		font-size: var(--t-xl);
+		line-height: 1;
+		color: var(--accent-ink);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.slice {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto 84px auto;
+		gap: var(--s-3);
+		align-items: center;
+		padding: var(--s-2) 0;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.slice > input[type='text'] {
+		min-width: 0;
+	}
+
+	.slice-amount {
+		text-align: right;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+		color: var(--accent-ink);
+	}
+
+	@media (max-width: 560px) {
+		.slice {
+			grid-template-columns: minmax(0, 1fr) auto auto;
+		}
+
+		.slice > input[type='text'] {
+			grid-column: 1 / -1;
+		}
+	}
+
+	/* The paid list. One button per player, big enough to hit on a phone while
+	   somebody is handing you a twenty. */
+	.marks {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		gap: var(--s-2);
+	}
+
+	.mark {
+		display: grid;
+		grid-template-columns: 20px minmax(0, 1fr) auto;
+		gap: var(--s-3);
+		align-items: center;
+		min-height: var(--tap);
+		padding: var(--s-2) var(--s-3);
+		border-radius: var(--r-sm);
+		border: 1px solid var(--border);
+		background: var(--danger-soft);
+		box-shadow: inset 3px 0 0 var(--danger);
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+		transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease),
+			transform var(--dur-1) var(--ease);
+	}
+
+	.mark--paid {
+		background: var(--ok-soft);
+		box-shadow: inset 3px 0 0 var(--ok);
+	}
+
+	.mark:active:not(:disabled) {
+		transform: translateY(1px);
+	}
+
+	.mark:disabled {
+		opacity: 0.55;
+		cursor: default;
+	}
+
+	.mark-tick {
+		font-weight: 900;
+		line-height: 1;
+		color: var(--danger);
+	}
+
+	.mark--paid .mark-tick {
+		color: var(--ok);
+	}
+
+	.mark-name {
+		font-weight: 700;
+		overflow-wrap: anywhere;
+	}
+
+	.mark-state {
+		font-family: var(--font-mono);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--danger);
+	}
+
+	.mark--paid .mark-state {
+		color: var(--ok);
+	}
+
+	.preview {
+		margin: 0 0 var(--s-4);
+		padding-left: var(--s-5);
+		font-size: var(--t-sm);
+	}
+
+	.danger {
+		color: var(--danger);
+		font-weight: 800;
+	}
+
 	/* The original's tab rail: a dark inset trough on the turf with the active
 	   tab punched out in chalk. Scrolls sideways rather than wrapping, so the
 	   desk keeps one row of tabs on a phone. */

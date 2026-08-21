@@ -373,6 +373,19 @@ img {
 	font-variant-numeric: tabular-nums;
 }
 
+/* A section rule inside a card: mono, spaced, quiet. Used by the boards and by
+   the Desk, which is why it lives here rather than in one page's scoped block —
+   the second copy is where a shared style starts to drift. */
+.rail {
+	margin: var(--s-5) 0 var(--s-3);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 800;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+
 /* ── Banner ────────────────────────────────────────────────────────────── */
 
 /* CHROME. The banner and footer are navy — the crest's own ground — so the

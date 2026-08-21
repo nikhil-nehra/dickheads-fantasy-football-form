@@ -146,17 +146,22 @@ describe('[4] closing is enforced by the server', () => {
 });
 
 describe('[5] boards outlive their survey', () => {
+	// The Pot used to be the board tested here, back when it was a readout of
+	// the intake survey. It no longer reads a survey at all, so the assertion
+	// moved to the board that still does: the Rivalry Board publishes the
+	// punishment verdict, which is a settled ruling rather than a tally.
 	it('serves board data while the survey is closed', async () => {
-		const html = await page('/b/pot');
-		expect(html).toContain('winning buy-in');
-		expect(html).toContain('$50');
+		const html = await page('/b/rivalry');
+		expect(html).toContain('The Rivalry Board');
+		expect(html).toContain('Permanent record');
 	});
 
 	it('still serves board data once the survey is archived', async () => {
 		await setStatus(cookie, 'intake', 'archived');
-		const html = await page('/b/pot');
-		expect(html).toContain('winning buy-in');
-		expect(html).toContain('$50');
+		await setStatus(cookie, 'rivalry', 'archived');
+		const html = await page('/b/rivalry');
+		expect(html).toContain('The Rivalry Board');
+		expect(html).toContain('Permanent record');
 	});
 
 	it('gives each board its own link-preview metadata', async () => {
@@ -496,14 +501,118 @@ describe('[13] Draft Day is a countdown, not a survey readout', () => {
 
 	it('keeps raw submissions off the pot board too', async () => {
 		const html = await page('/b/pot');
-		expect(html).toContain('winning buy-in');
 		expect(html).not.toContain(SECRET);
 		expect(html).not.toContain('Aug 28');
+		// The buy-in vote, which this board used to publish as bars.
+		expect(html).not.toContain('votes');
 	});
 
 	it('still shows the commissioner everything on the Desk', async () => {
 		const res = await fetch(`${BASE}/desk`, { headers: { cookie } });
 		const html = await res.text();
 		expect(html).toContain(SECRET);
+	});
+});
+
+describe('[14] The Pot is set from the Desk, not counted from a survey', () => {
+	const SECRET = 'loser gets waterboarded with ranch';
+
+	it('says so plainly before a buy-in has been set', async () => {
+		const html = await page('/b/pot');
+		expect(html).toMatch(/has not set the buy-in yet/);
+	});
+
+	it('refuses a split that does not total 100%', async () => {
+		const res = await api('/api/desk/pot', {
+			buyIn: 50,
+			split: [
+				{ label: '1st place', pct: 60 },
+				{ label: '2nd place', pct: 30 }
+			]
+		}, { cookie });
+		expect(res.status).toBe(422);
+		expect(JSON.stringify(res.body)).toMatch(/totals 90%/);
+	});
+
+	it('refuses a stranger', async () => {
+		const res = await api('/api/desk/pot', { buyIn: 50, split: [] });
+		expect(res.status).toBe(403);
+	});
+
+	it('accepts a valid pot and publishes it', async () => {
+		const res = await api('/api/desk/pot', {
+			buyIn: 50,
+			split: [
+				{ label: '1st place', pct: 60 },
+				{ label: '2nd place', pct: 30 },
+				{ label: '3rd place', pct: 10 }
+			]
+		}, { cookie });
+		expect(res.status).toBe(200);
+
+		const html = await page('/b/pot');
+		// $50 x 14 players.
+		expect(html).toContain('$700');
+		expect(html).toContain('buy-in');
+		expect(html).toContain('1st place');
+		// 60% of $700, in real dollars rather than a percentage.
+		expect(html).toContain('$420');
+	});
+
+	it('still publishes no survey answers once it has real numbers', async () => {
+		const html = await page('/b/pot');
+		expect(html).not.toContain(SECRET);
+		expect(html).not.toContain('Aug 28');
+		expect(html).not.toContain('Rank the weekends');
+	});
+
+	it('lists the whole roster as owing before anyone is marked', async () => {
+		const html = await page('/b/pot');
+		expect(html).toContain('Who has paid');
+		expect(html).toContain('owes $50');
+		expect(html).toContain('$0');
+	});
+
+	it('refuses a payment mark from a stranger', async () => {
+		const res = await api('/api/desk/payment', { playerId: 'nikhil-nehra', paid: true });
+		expect(res.status).toBe(403);
+	});
+
+	it('refuses a payment mark for somebody not on the roster', async () => {
+		const res = await api(
+			'/api/desk/payment',
+			{ playerId: 'not-a-player', paid: true },
+			{ cookie }
+		);
+		expect(res.status).toBe(404);
+	});
+
+	it('refuses a mark with no true/false', async () => {
+		const res = await api('/api/desk/payment', { playerId: 'nikhil-nehra' }, { cookie });
+		expect(res.status).toBe(400);
+	});
+
+	it('marks a player paid and moves the money', async () => {
+		const res = await api(
+			'/api/desk/payment',
+			{ playerId: 'nikhil-nehra', paid: true },
+			{ cookie }
+		);
+		expect(res.status).toBe(200);
+
+		const html = await page('/b/pot');
+		// One buy-in in, out of fourteen.
+		expect(html).toContain('$50');
+		expect(html).toContain('Nikhil Nehra');
+	});
+
+	it('un-marks a player again', async () => {
+		const res = await api(
+			'/api/desk/payment',
+			{ playerId: 'nikhil-nehra', paid: false },
+			{ cookie }
+		);
+		expect(res.status).toBe(200);
+		expect(await page('/b/pot')).toContain('owes $50');
 	});
 });

@@ -10,11 +10,14 @@ import {
 	listNegotiation,
 	listRulings,
 	recentAudit,
-	ensureSurveys
+	ensureSurveys,
+	getPotConfig,
+	listPayments
 } from '$lib/server/db';
 import { pairingProblems } from '$lib/pairing';
 import { suggestAll, type SleeperAccount } from '$lib/sleeperMatch';
 import { readSleeper, type SleeperUser } from '$lib/server/sleeper';
+import { SUGGESTED_SPLIT } from '$lib/pot';
 
 export const load: PageServerLoad = async ({ platform, locals }) => {
 	// Nothing beyond "you are not logged in" is loaded for a stranger, so the
@@ -106,9 +109,23 @@ export const load: PageServerLoad = async ({ platform, locals }) => {
 		accounts.filter((a) => !linked.has(a.userId))
 	);
 
+	// The pot: the buy-in, the split, and who has handed money over. All three
+	// are commissioner-set facts, so they share one tab.
+	const pot = await getPotConfig(db, season);
+	const payments = await listPayments(db, season);
+	const paidIds = new Set(payments.filter((p) => p.paid === 1).map((p) => p.player_id));
+
 	return {
 		authed: true as const,
 		season,
+		pot: {
+			buyIn: pot.buyIn,
+			// A blank split editor is a worse starting point than a sensible one
+			// nobody has committed to yet.
+			split: pot.split.length ? pot.split : SUGGESTED_SPLIT,
+			saved: pot.split.length > 0 || pot.buyIn > 0
+		},
+		paidIds: [...paidIds],
 		sleeper: {
 			accounts,
 			suggestions,

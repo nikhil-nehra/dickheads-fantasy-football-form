@@ -84,6 +84,8 @@ export const WRITABLE: SurveyStatus[] = ['open'];
 import { norm } from '../text';
 export { norm };
 
+import { EMPTY_POT, parsePot, type PaymentRow, type PotConfig } from '../pot';
+
 /* ── Players ─────────────────────────────────────────────────────────────── */
 
 export async function listPlayers(db: D1Database, includeInactive = false): Promise<Player[]> {
@@ -317,6 +319,87 @@ export async function ensureBallotOption(
 		.bind(opt.surveyId, opt.questionId, n)
 		.first<{ id: string }>();
 	return row?.id ?? null;
+}
+
+/* ── The pot ─────────────────────────────────────────────────────────────── */
+
+/**
+ * The buy-in and split for a season. An absent row means "not decided yet",
+ * which the board renders as such rather than as a $0 pot.
+ */
+export async function getPotConfig(db: D1Database, season: string): Promise<PotConfig> {
+	const row = await db
+		.prepare('SELECT buy_in, split FROM pot_config WHERE season = ?')
+		.bind(season)
+		.first<{ buy_in: number; split: string }>();
+	return row ? parsePot(row.buy_in, row.split) : EMPTY_POT;
+}
+
+/** One upsert, like every other mutation here — nothing to read-modify-write. */
+export async function setPotConfig(
+	db: D1Database,
+	season: string,
+	config: PotConfig,
+	by: string
+): Promise<void> {
+	await db
+		.prepare(
+			`INSERT INTO pot_config (season, buy_in, split, updated_at, updated_by)
+			 VALUES (?1, ?2, ?3, datetime('now'), ?4)
+			 ON CONFLICT(season) DO UPDATE SET
+			   buy_in     = excluded.buy_in,
+			   split      = excluded.split,
+			   updated_at = excluded.updated_at,
+			   updated_by = excluded.updated_by`
+		)
+		.bind(season, config.buyIn, JSON.stringify(config.split), by)
+		.run();
+}
+
+/** Who has paid this season. A missing row is "not paid" — nothing to seed. */
+export async function listPayments(db: D1Database, season: string): Promise<PaymentRow[]> {
+	const { results } = await db
+		.prepare('SELECT player_id, paid FROM payment WHERE season = ?')
+		.bind(season)
+		.all<PaymentRow>();
+	return results;
+}
+
+/**
+ * Mark one player paid or unpaid.
+ *
+ * One upsert for one player, so marking two people paid from two devices does
+ * not involve a shared blob one of them would clobber. Returns false when the
+ * player id is not on the roster, which the endpoint reports rather than
+ * writing an orphan row a foreign key would only catch at the next migration.
+ */
+export async function setPayment(
+	db: D1Database,
+	season: string,
+	playerId: string,
+	paid: boolean,
+	by: string
+): Promise<boolean> {
+	const player = await db
+		.prepare('SELECT id FROM player WHERE id = ?')
+		.bind(playerId)
+		.first<{ id: string }>();
+	if (!player) return false;
+
+	await db
+		.prepare(
+			`INSERT INTO payment (season, player_id, paid, marked_at, marked_by)
+			 VALUES (?1, ?2, ?3, datetime('now'), ?4)
+			 ON CONFLICT(season, player_id) DO UPDATE SET
+			   paid      = excluded.paid,
+			   marked_at = excluded.marked_at,
+			   marked_by = excluded.marked_by`
+		)
+		.bind(season, playerId, paid ? 1 : 0, by)
+		.run();
+
+	await audit(db, by, paid ? 'pot.paid' : 'pot.unpaid', playerId);
+	return true;
 }
 
 /* ── Pairings and negotiation ────────────────────────────────────────────── */

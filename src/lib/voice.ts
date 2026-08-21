@@ -87,7 +87,10 @@ export const EMPTY = {
 	notPicked: 'Pick your name to get started. Yes, your actual one.',
 	noDraftDate:
 		"Sleeper hasn't been given a draft time yet. Set one in the Sleeper app and it turns up here on its own.",
-	noRuns: 'Nobody has eaten a burger. Fourteen empty plates and one very disappointed commissioner.'
+	noRuns: 'Nobody has eaten a burger. Fourteen empty plates and one very disappointed commissioner.',
+	noBuyIn:
+		'The commissioner has not set the buy-in yet. Until he does, this is a league playing for pride.',
+	noSplit: 'No payout split set. Winner takes everything, apparently, including the argument.'
 } as const;
 
 export const LOADING: readonly string[] = [
@@ -218,3 +221,35 @@ export function burgerRoast(pending: readonly string[], total: number): string |
 
 	return `${pending.length} of you have not eaten. That is half the league drafting on vibes.`;
 }
+
+/* ── The money ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Name and shame whoever still owes the buy-in. Null when everyone has paid,
+ * so the caller prints the settled line instead.
+ */
+export function duesRoast(owing: readonly string[], total: number): string | null {
+	if (owing.length === 0) return null;
+
+	if (owing.length === total) {
+		return `Not one of you has paid. The pot is currently a rumour.`;
+	}
+
+	if (owing.length === 1) {
+		return `Everyone has paid except ${owing[0]}. The whole pot is waiting on ${owing[0]}.`;
+	}
+
+	if (owing.length <= 4) {
+		const list = `${owing.slice(0, -1).join(', ')} and ${owing[owing.length - 1]}`;
+		return `Still owed by ${list}. Pay the man, gentlemen.`;
+	}
+
+	return `${owing.length} of you have not paid. A pot this theoretical cannot be won.`;
+}
+
+/** For the moment everyone is square. */
+export const PAID_UP = 'Everyone has paid. Genuinely, well done — this has never happened before.';
+
+/** Before the commissioner has marked anyone. */
+export const NOBODY_MARKED =
+	'Nobody is marked paid yet. Either the season has not started or the commissioner has not been to the Desk.';

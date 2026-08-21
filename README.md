@@ -44,6 +44,8 @@ Most of what you'll want to change day to day needs no code at all.
 | Link a player to a Sleeper account | Desk → **Sleeper** | instantly |
 | Standings, scores, playoff brackets | nothing — the cron syncs every 10 min | automatic |
 | The draft date on Draft Day | move it in the **Sleeper app** | within 10 min |
+| The buy-in and the payout split | Desk → **The Pot** | instantly |
+| Who has paid | Desk → **The Pot** | instantly |
 | A burger challenge time | add a line to `src/lib/draft.ts`, push to `main` | ~2 min via CI |
 | Questions, copy, boards, styling | edit the code, push to `main` | ~2 min via CI |
 | Add a player | a row in the `player` table | next page load |
@@ -124,6 +126,7 @@ src/
     server/           db.ts · auth.ts · ballot.ts · sleeper.ts
     boards/           board definitions
     draft.ts          the two Draft Day clocks and the burger challenge
+    pot.ts            the buy-in, the split in dollars, and the paid ledger
     tally.ts          aggregation, by question type
     negotiation.ts    deriving agreement
     pairing.ts        auto-pairing from beef rankings
@@ -139,8 +142,8 @@ db/
   seed.sql            the roster
 workers/sleeper-sync/ the cron worker
 legacy/               the previous implementation, kept for reference
-tests/unit/           105 tests over the pure logic
-tests/e2e/            43 tests over the real bundle, on a throwaway D1
+tests/unit/           124 tests over the pure logic
+tests/e2e/            54 tests over the real bundle, on a throwaway D1
 ```
 
 ---
@@ -239,6 +242,14 @@ What it gives you:
 
 Deliberately *not* fetched: `/v1/players/nfl`. It is a 5 MB catalogue of every
 player in the NFL and nothing here renders individual players.
+
+Also deliberately not fetched: the **League Dues Tracker**. It exists, and it is
+queryable — `league_dues_config` and `league_dues_owed_by_roster` on
+`api.sleeper.app/graphql`, not the REST v1 API — but every dues read needs a
+Sleeper *account* token, which would have to live as a Worker secret, is scoped
+to the whole account rather than this league, and expires without announcing
+itself. Who has paid is marked on the Desk instead. If you ever want to revisit
+this, the queries above are the whole integration.
 
 ### Linking players to Sleeper accounts
 
@@ -357,11 +368,10 @@ verify *who* is writing, so it is strict about everything else:
   of a negotiation even by asking for it directly.
 
 Everything a board shows is public and never expires. That is the point of the
-boards — which is exactly why **no board publishes raw survey answers**. They
-ship aggregates and derived facts only: the pot board sends counted bars rather
-than fourteen people's submissions, and Draft Day reads no survey at all. The
-intake answers themselves — punishment write-ins, availability, beef rankings —
-are visible on the Desk and nowhere else.
+boards — which is exactly why **no board publishes survey answers**. Draft Day
+and The Pot read no survey at all; the Rivalry Board publishes settled rulings,
+not tallies. The intake answers themselves — punishment write-ins, availability,
+beef rankings — are visible on the Desk and nowhere else.
 
 **The commissioner** is a PIN exchanged for an httpOnly, `SameSite=Strict`
 session cookie. Every desk action is written to `audit_log`, so who closed what

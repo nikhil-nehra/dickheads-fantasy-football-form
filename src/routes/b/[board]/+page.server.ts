@@ -9,7 +9,9 @@ import {
 	listBallotOptions,
 	listPairings,
 	listNegotiation,
-	listRulings
+	listRulings,
+	getPotConfig,
+	listPayments
 } from '$lib/server/db';
 import {
 	readSleeper,
@@ -17,8 +19,8 @@ import {
 	type SleeperDraft,
 	type StandingsRow
 } from '$lib/server/sleeper';
-import { singleTally, allocationAverage, missing } from '$lib/tally';
 import { CHALLENGE_CLOSES, daysOut, draftOrder, leagueTime } from '$lib/draft';
+import { ledger, payouts } from '$lib/pot';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    "Surveys close. Boards are forever."
@@ -201,67 +203,33 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		};
 	}
 
-	// The pot board is the only survey-backed board left, and it publishes
-	// AGGREGATES ONLY. It used to ship every raw submission to the browser —
-	// punishment write-ins, availability, beef rankings and all — for the sake
-	// of one bar chart it could have been handed pre-counted.
-	const def = surveyById(board.from);
-	if (!def) error(404, 'No such board.');
+	/* ── The Pot ─────────────────────────────────────────────────────────────
+	   No survey. Not one read.
 
-	const rows = await listResponses(db, def.id);
-	const submissions = rows.map((r) => {
-		let answers: Record<string, unknown> = {};
-		try {
-			answers = JSON.parse(r.answers);
-		} catch {
-			answers = {};
-		}
-		return {
-			playerId: r.player_id,
-			playerName: nameOf.get(r.player_id) ?? r.player_id,
-			answers
-		};
-	});
+	   Everything here is a commissioner-set fact: the buy-in and the split out
+	   of `pot_config`, who has paid out of `payment`. The board used to publish
+	   the buy-in VOTE — bars, vote counts, "from the 13 who answered" — and to
+	   get them it shipped every raw intake submission to every visitor,
+	   punishment write-ins and beef rankings included. Those answers are the
+	   Desk's business. */
+	if (board.id !== 'pot') error(404, 'No such board.');
 
-	const buyInQ = allQuestions(def).find((q) => q.id === 'buyIn');
-	const allocQ = allQuestions(def).find((q) => q.type === 'allocation');
+	const [config, payments] = await Promise.all([
+		getPotConfig(db, season),
+		listPayments(db, season)
+	]);
 
-	let pot: {
-		rows: ReturnType<typeof singleTally>;
-		winner: ReturnType<typeof singleTally>[number];
-		amount: number;
-		projected: number;
-		collected: number;
-		split: ReturnType<typeof allocationAverage> | null;
-	} | null = null;
-
-	if (buyInQ?.type === 'single') {
-		const tally = singleTally(buyInQ, submissions);
-		const winner = tally[0];
-		if (winner) {
-			// A PROJECTION over the whole roster, not money collected — the old
-			// board printed the same number as a flat fact.
-			const amount = Number(winner.id) || 0;
-			pot = {
-				rows: tally,
-				winner,
-				amount,
-				projected: amount * players.length,
-				collected: amount * submissions.length,
-				split:
-					allocQ?.type === 'allocation' ? allocationAverage(allocQ, submissions) : null
-			};
-		}
-	}
+	const roll = ledger(players, payments, config.buyIn);
+	const pot = config.buyIn * players.length;
 
 	return {
 		...base,
 		kind: 'pot' as const,
+		buyIn: config.buyIn,
 		pot,
-		answered: submissions.length,
-		missing: missing(
-			players.map((p) => ({ id: p.id, display_name: p.display_name })),
-			submissions
-		)
+		collected: roll.collected,
+		payouts: payouts(config.split, pot),
+		paid: roll.paid,
+		owing: roll.owing
 	};
 };
