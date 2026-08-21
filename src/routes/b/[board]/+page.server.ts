@@ -11,7 +11,14 @@ import {
 	listNegotiation,
 	listRulings
 } from '$lib/server/db';
-import { readSleeper, resolveVictim, type StandingsRow } from '$lib/server/sleeper';
+import {
+	readSleeper,
+	resolveVictim,
+	type SleeperDraft,
+	type StandingsRow
+} from '$lib/server/sleeper';
+import { singleTally, allocationAverage, missing } from '$lib/tally';
+import { CHALLENGE_CLOSES, daysOut, draftOrder, leagueTime } from '$lib/draft';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    "Surveys close. Boards are forever."
@@ -150,7 +157,54 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		};
 	}
 
-	// draft and pot both read the intake survey.
+	if (board.id === 'draft') {
+		// Two clocks and a running order. Note what is NOT here: a single read of
+		// the intake survey. That board used to publish everyone's availability
+		// grid; it is Desk-only now.
+		const draft = await readSleeper<SleeperDraft>(db, 'draft');
+		const syncedAt = await readSleeper<{ at: string }>(db, 'meta');
+		const now = Date.now();
+		const startsAt = draft?.startTime ?? null;
+		const order = draftOrder(
+			players.map((p) => ({ id: p.id, display_name: p.display_name }))
+		);
+
+		return {
+			...base,
+			kind: 'draft' as const,
+			// Server time, rendered as-is on the first client pass too — the
+			// ticking only starts after mount, so hydration has nothing to
+			// disagree about.
+			now,
+			startsAt,
+			// Formatted here rather than in the browser so a reader in another
+			// timezone sees the same words as everyone in Dallas.
+			startsAtLabel: startsAt ? leagueTime(startsAt) : null,
+			daysOut: startsAt ? daysOut(now, startsAt) : null,
+			draftType: draft?.type ?? null,
+			rounds: draft?.rounds ?? null,
+			pickTimer: draft?.pickTimer ?? null,
+			challengeClosesAt: CHALLENGE_CLOSES,
+			// The deadline is midnight; label it with the minute before it, or it
+			// reads as a date nobody agreed to.
+			challengeClosesLabel: leagueTime(CHALLENGE_CLOSES - 60_000),
+			picks: order.picks,
+			// Keyed by id on the board, not by name — two players sharing a
+			// display name would be a duplicate-key render error.
+			pending: order.pending.map((p) => ({ id: p.id, name: p.display_name })),
+			// In league time like everything else on this board — the standings
+			// board stamps raw UTC, but nothing else here speaks UTC.
+			fetchedAt: (() => {
+				const at = syncedAt?.at ? Date.parse(syncedAt.at) : NaN;
+				return Number.isFinite(at) ? leagueTime(at) : null;
+			})()
+		};
+	}
+
+	// The pot board is the only survey-backed board left, and it publishes
+	// AGGREGATES ONLY. It used to ship every raw submission to the browser —
+	// punishment write-ins, availability, beef rankings and all — for the sake
+	// of one bar chart it could have been handed pre-counted.
 	const def = surveyById(board.from);
 	if (!def) error(404, 'No such board.');
 
@@ -169,14 +223,45 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		};
 	});
 
-	const ballots: Record<string, { id: string; text: string }[]> = {};
-	for (const q of allQuestions(def)) {
-		if (q.type !== 'ballot') continue;
-		ballots[q.id] = (await listBallotOptions(db, def.id, q.id)).map((o) => ({
-			id: o.id,
-			text: o.text
-		}));
+	const buyInQ = allQuestions(def).find((q) => q.id === 'buyIn');
+	const allocQ = allQuestions(def).find((q) => q.type === 'allocation');
+
+	let pot: {
+		rows: ReturnType<typeof singleTally>;
+		winner: ReturnType<typeof singleTally>[number];
+		amount: number;
+		projected: number;
+		collected: number;
+		split: ReturnType<typeof allocationAverage> | null;
+	} | null = null;
+
+	if (buyInQ?.type === 'single') {
+		const tally = singleTally(buyInQ, submissions);
+		const winner = tally[0];
+		if (winner) {
+			// A PROJECTION over the whole roster, not money collected — the old
+			// board printed the same number as a flat fact.
+			const amount = Number(winner.id) || 0;
+			pot = {
+				rows: tally,
+				winner,
+				amount,
+				projected: amount * players.length,
+				collected: amount * submissions.length,
+				split:
+					allocQ?.type === 'allocation' ? allocationAverage(allocQ, submissions) : null
+			};
+		}
 	}
 
-	return { ...base, kind: 'survey' as const, def, submissions, ballots };
+	return {
+		...base,
+		kind: 'pot' as const,
+		pot,
+		answered: submissions.length,
+		missing: missing(
+			players.map((p) => ({ id: p.id, display_name: p.display_name })),
+			submissions
+		)
+	};
 };

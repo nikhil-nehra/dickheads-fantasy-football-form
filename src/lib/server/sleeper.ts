@@ -36,11 +36,34 @@ export type SleeperUser = {
 	avatar: string | null;
 };
 
+/**
+ * The league's draft, as the sync worker flattens it out of
+ * `/v1/draft/<draft_id>`.
+ *
+ * This is the ONLY source of the draft date on the site. It is not duplicated
+ * in a constant anywhere: the commissioner moves the draft in the Sleeper app
+ * and the board follows within a cron tick, with nothing to remember to edit.
+ */
+export type SleeperDraft = {
+	draftId: string;
+	/** Epoch milliseconds, or null while no time has been set. */
+	startTime: number | null;
+	/** 'pre_draft' | 'drafting' | 'complete', per Sleeper. */
+	status: string | null;
+	/** 'snake', 'linear' or 'auction'. */
+	type: string | null;
+	rounds: number | null;
+	/** Seconds on the pick clock. */
+	pickTimer: number | null;
+	teams: number | null;
+};
+
 /** Cache keys written by the sync worker. */
 export type CacheKey =
 	| 'meta'
 	| 'state'
 	| 'league'
+	| 'draft'
 	| 'users'
 	| 'rosters'
 	| 'standings'

@@ -43,6 +43,8 @@ Most of what you'll want to change day to day needs no code at all.
 | Settle a stuck rivalry line | Desk → **Rivalries** → Rule | instantly |
 | Link a player to a Sleeper account | Desk → **Sleeper** | instantly |
 | Standings, scores, playoff brackets | nothing — the cron syncs every 10 min | automatic |
+| The draft date on Draft Day | move it in the **Sleeper app** | within 10 min |
+| A burger challenge time | add a line to `src/lib/draft.ts`, push to `main` | ~2 min via CI |
 | Questions, copy, boards, styling | edit the code, push to `main` | ~2 min via CI |
 | Add a player | a row in the `player` table | next page load |
 
@@ -121,6 +123,7 @@ src/
     components/       one component per question type, plus shared chrome
     server/           db.ts · auth.ts · ballot.ts · sleeper.ts
     boards/           board definitions
+    draft.ts          the two Draft Day clocks and the burger challenge
     tally.ts          aggregation, by question type
     negotiation.ts    deriving agreement
     pairing.ts        auto-pairing from beef rankings
@@ -136,8 +139,8 @@ db/
   seed.sql            the roster
 workers/sleeper-sync/ the cron worker
 legacy/               the previous implementation, kept for reference
-tests/unit/           86 tests over the pure logic
-tests/e2e/            36 tests over the real bundle, on a throwaway D1
+tests/unit/           105 tests over the pure logic
+tests/e2e/            43 tests over the real bundle, on a throwaway D1
 ```
 
 ---
@@ -222,6 +225,10 @@ staying under 1000 a minute — and pulls the playoff brackets once a day.
 What it gives you:
 
 - **Standings board** — real records and points, straight from the league.
+- **The draft date.** Draft Day's countdown reads `/v1/draft/<draft_id>`, so
+  the start time is whatever the Sleeper app says it is. Nothing in the repo
+  duplicates it — move the draft in Sleeper and the board follows on the next
+  tick.
 - **Roster linking** — see below. Automatic exact-name matching links nobody in
   this league, so the Desk suggests and you confirm.
 - **The punishment's victim, resolved from data.** "Last place — regular
@@ -350,7 +357,11 @@ verify *who* is writing, so it is strict about everything else:
   of a negotiation even by asking for it directly.
 
 Everything a board shows is public and never expires. That is the point of the
-boards.
+boards — which is exactly why **no board publishes raw survey answers**. They
+ship aggregates and derived facts only: the pot board sends counted bars rather
+than fourteen people's submissions, and Draft Day reads no survey at all. The
+intake answers themselves — punishment write-ins, availability, beef rankings —
+are visible on the Desk and nowhere else.
 
 **The commissioner** is a PIN exchanged for an httpOnly, `SameSite=Strict`
 session cookie. Every desk action is written to `audit_log`, so who closed what

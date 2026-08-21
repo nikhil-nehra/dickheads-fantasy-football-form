@@ -84,7 +84,10 @@ export const EMPTY = {
 		"Sleeper hasn't handed over any data yet. Either the season hasn't started or the commissioner hasn't wired it up.",
 	noResponses: 'Not one response. Fourteen grown adults, zero of them capable of clicking a link.',
 	noPunishments: 'Nobody has suggested a punishment. Somehow that is worse than a bad one.',
-	notPicked: 'Pick your name to get started. Yes, your actual one.'
+	notPicked: 'Pick your name to get started. Yes, your actual one.',
+	noDraftDate:
+		"Sleeper hasn't been given a draft time yet. Set one in the Sleeper app and it turns up here on its own.",
+	noRuns: 'Nobody has eaten a burger. Fourteen empty plates and one very disappointed commissioner.'
 } as const;
 
 export const LOADING: readonly string[] = [
@@ -176,4 +179,42 @@ const LAST_PLACE: readonly string[] = [
 
 export function lastPlaceNote(name: string): string {
 	return `${name} — ${pick(LAST_PLACE, name)}.`;
+}
+
+/* ── The burger challenge ─────────────────────────────────────────── */
+
+/** The draft order is bought with a burger. These are the two states it can be in. */
+export const DRAFT = {
+	/** Under the big clock, before the draft. */
+	waiting: 'Order below is provisional until the last burger is down.',
+	/** Under the big clock, once the draft time has passed. */
+	live: "You're on the clock. Whatever you did to that burger, you live with it now.",
+	/** Under the order, once everybody has eaten. */
+	locked: 'All fourteen plates clean. This order is final and nobody gets to argue.',
+	/** Under the order, once the deadline has gone and somebody still hasn't. */
+	forfeit:
+		'Deadline gone. Anyone still unlisted drafts behind everyone who could be bothered to chew.'
+} as const;
+
+/**
+ * Name and shame whoever still owes the league a burger. Returns null when
+ * everyone has eaten, so the caller renders the locked line instead.
+ */
+export function burgerRoast(pending: readonly string[], total: number): string | null {
+	if (pending.length === 0) return null;
+
+	if (pending.length === total) {
+		return `Not one of you has eaten. All ${total}, holding up the entire draft over a sandwich.`;
+	}
+
+	if (pending.length === 1) {
+		return `Everyone has eaten except ${pending[0]}. It is one burger, ${pending[0]}. Pick number ${total} is yours if you keep this up.`;
+	}
+
+	if (pending.length <= 4) {
+		const list = `${pending.slice(0, -1).join(', ')} and ${pending[pending.length - 1]}`;
+		return `Still waiting on ${list} to sit down and eat. The clock is not sympathetic.`;
+	}
+
+	return `${pending.length} of you have not eaten. That is half the league drafting on vibes.`;
 }

@@ -47,6 +47,16 @@ type SleeperRoster = {
 
 type BracketMatch = { r?: number; m?: number; w?: number | null; l?: number | null };
 
+type SleeperLeague = { draft_id?: string | null };
+
+type SleeperDraft = {
+	draft_id: string;
+	start_time?: number | null;
+	status?: string | null;
+	type?: string | null;
+	settings?: { rounds?: number; pick_timer?: number; teams?: number };
+};
+
 async function get<T>(path: string): Promise<T | null> {
 	try {
 		const res = await fetch(`${API}${path}`, {
@@ -164,12 +174,34 @@ async function sync(env: Env, daily: boolean): Promise<Record<string, unknown>> 
 	if (state) await put(db, 'state', state);
 
 	const [info, users, rosters] = await Promise.all([
-		get<unknown>(`/league/${league}`),
+		get<SleeperLeague>(`/league/${league}`),
 		get<SleeperUser[]>(`/league/${league}/users`),
 		get<SleeperRoster[]>(`/league/${league}/rosters`)
 	]);
 
 	if (info) await put(db, 'league', info);
+
+	// The draft, flattened to the handful of fields the Draft Day board reads.
+	// This is what makes the countdown on that board follow the Sleeper app: the
+	// commissioner moves the start time there and the site catches up on the
+	// next tick, with no constant to remember to edit. One extra call every ten
+	// minutes, which is nothing against Sleeper's 1000/minute guidance.
+	let draftStart: number | null = null;
+	if (info?.draft_id) {
+		const draft = await get<SleeperDraft>(`/draft/${info.draft_id}`);
+		if (draft) {
+			draftStart = draft.start_time ?? null;
+			await put(db, 'draft', {
+				draftId: draft.draft_id,
+				startTime: draft.start_time ?? null,
+				status: draft.status ?? null,
+				type: draft.type ?? null,
+				rounds: draft.settings?.rounds ?? null,
+				pickTimer: draft.settings?.pick_timer ?? null,
+				teams: draft.settings?.teams ?? null
+			});
+		}
+	}
 
 	if (users) {
 		await put(
@@ -240,7 +272,7 @@ async function sync(env: Env, daily: boolean): Promise<Record<string, unknown>> 
 
 	await put(db, 'meta', { at: new Date().toISOString(), week, daily });
 
-	return { week, linked, autoclosed, daily };
+	return { week, linked, autoclosed, daily, draftStart };
 }
 
 export default {

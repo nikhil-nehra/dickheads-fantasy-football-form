@@ -447,3 +447,63 @@ describe('[12] rate limiting', () => {
 		expect(results).toContain(429);
 	});
 });
+
+describe('[13] Draft Day is a countdown, not a survey readout', () => {
+	const SECRET = 'loser gets waterboarded with ranch';
+
+	beforeAll(async () => {
+		await setStatus(cookie, 'intake', 'open');
+		await api('/api/surveys/intake/response', {
+			playerId: 'sean-vargeese',
+			answers: intakeAnswers('sean-vargeese', { punishment: SECRET })
+		});
+	});
+
+	it('publishes the burger order, fastest pick first', async () => {
+		const html = await page('/b/draft');
+		expect(html).toContain('Rayyan Ali');
+		expect(html).toContain('0:36.00');
+		expect(html).toContain('9:28.34');
+	});
+
+	it('names whoever still owes the league a burger', async () => {
+		const html = await page('/b/draft');
+		// Seeded, never given a time — must show up as unseeded, not vanish.
+		expect(html).toContain('Dhruv Nandwani');
+	});
+
+	it('runs a second clock to the end of Aug 31', async () => {
+		const html = await page('/b/draft');
+		expect(html).toContain('Burger challenge closes');
+		expect(html).toContain('Aug 31');
+	});
+
+	it('says so plainly when Sleeper has not been given a draft time', async () => {
+		// The e2e database has never been touched by the sync worker, so there
+		// is no cached draft — the board must degrade to a sentence, not a blank.
+		const html = await page('/b/draft');
+		expect(html).toMatch(/Sleeper hasn't been given a draft time yet/);
+	});
+
+	// The whole point of the rewrite: intake answers are Desk-only now.
+	it('publishes none of the intake survey', async () => {
+		const html = await page('/b/draft');
+		expect(html).not.toContain(SECRET);
+		// The availability grid the old Draft Day board was built out of.
+		expect(html).not.toContain('Aug 28');
+		expect(html).not.toContain('Rank the weekends');
+	});
+
+	it('keeps raw submissions off the pot board too', async () => {
+		const html = await page('/b/pot');
+		expect(html).toContain('winning buy-in');
+		expect(html).not.toContain(SECRET);
+		expect(html).not.toContain('Aug 28');
+	});
+
+	it('still shows the commissioner everything on the Desk', async () => {
+		const res = await fetch(`${BASE}/desk`, { headers: { cookie } });
+		const html = await res.text();
+		expect(html).toContain(SECRET);
+	});
+});

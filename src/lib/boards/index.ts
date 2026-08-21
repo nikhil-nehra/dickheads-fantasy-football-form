@@ -37,12 +37,15 @@ export const BOARDS: BoardDefinition[] = [
 	{
 		id: 'draft',
 		title: 'Draft Day',
-		from: 'intake',
+		// Sleeper owns the date; the running order is bought with a burger.
+		// Neither of those is survey data, and the intake answers this board
+		// used to publish are now Desk-only.
+		from: 'sleeper',
 		blurb:
-			'The winning weekend, who is showing up in person, and who is still unaccounted for.',
+			'The countdown to first pick, and the draft order as the burger challenge has left it.',
 		og: {
 			title: 'Draft Day',
-			description: 'The winning weekend, the best single date, and who still has not answered.'
+			description: 'The countdown to first pick and the running order, earned one burger at a time.'
 		}
 	},
 	{
