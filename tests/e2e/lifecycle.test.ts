@@ -296,6 +296,29 @@ describe('[9] rivalry negotiation', () => {
 		expect(a.status).toBe(200);
 		expect(b.status).toBe(200);
 
+		// The NAME is the card's title, not a row in its body, so a name the two
+		// of them have not settled shows as an unnamed title card.
+		expect(await page('/b/rivalry')).toContain('Still unnamed');
+	});
+
+	it('shows a disputed body line as in dispute', async () => {
+		const a = await api('/api/surveys/rivalry/negotiation', {
+			pairingId,
+			playerId: 'nikhil-nehra',
+			fieldKey: 'side',
+			proposal: 'Loser wears a Commanders jersey',
+			pick: 'Loser wears a Commanders jersey'
+		});
+		const b = await api('/api/surveys/rivalry/negotiation', {
+			pairingId,
+			playerId: 'sean-vargeese',
+			fieldKey: 'side',
+			proposal: 'Something else entirely',
+			pick: 'Something else entirely'
+		});
+		expect(a.status).toBe(200);
+		expect(b.status).toBe(200);
+
 		expect(await page('/b/rivalry')).toContain('In dispute');
 	});
 
@@ -309,9 +332,53 @@ describe('[9] rivalry negotiation', () => {
 		});
 		expect(res.status).toBe(200);
 
+		// Agreement promotes it out of the body and onto the title card. The
+		// second pairing in this block is still unnamed, so the negative
+		// assertion here is about the NAME'S OWN BODY ROW being gone from every
+		// card — not about the unnamed placeholder being absent from the page.
 		const html = await page('/b/rivalry');
-		expect(html).toContain('Agreed');
 		expect(html).toContain('The Battle for the Last Brain Cell');
+		expect(html).not.toContain('Rivalry name');
+	});
+
+	it('normalises a money line, so "20" and "$20" are the same answer', async () => {
+		// Agreement is a string comparison. Without normalising, these two would
+		// disagree forever about a number they had both already agreed on.
+		const a = await api('/api/surveys/rivalry/negotiation', {
+			pairingId,
+			playerId: 'nikhil-nehra',
+			fieldKey: 'bet',
+			proposal: '20',
+			pick: '20'
+		});
+		const b = await api('/api/surveys/rivalry/negotiation', {
+			pairingId,
+			playerId: 'sean-vargeese',
+			fieldKey: 'bet',
+			proposal: '$20.00',
+			pick: '$20.00'
+		});
+		expect(a.status).toBe(200);
+		expect(b.status).toBe(200);
+
+		// A settled line shows the thing itself — the amount in its own tile —
+		// rather than an "Agreed" badge. Everything on this board is agreed;
+		// that is what the board is.
+		const html = await page('/b/rivalry');
+		expect(html).toContain('$20');
+		expect(html).toContain('stake-amount');
+	});
+
+	it('refuses prose on a money line', async () => {
+		const res = await api('/api/surveys/rivalry/negotiation', {
+			pairingId,
+			playerId: 'nikhil-nehra',
+			fieldKey: 'bet',
+			proposal: 'Loser buys the wings at the draft',
+			pick: 'Loser buys the wings at the draft'
+		});
+		expect(res.status).toBe(422);
+		expect(JSON.stringify(res.body)).toMatch(/dollar amount/);
 	});
 
 	it('refuses a write from someone outside the pairing', async () => {
@@ -614,5 +681,102 @@ describe('[14] The Pot is set from the Desk, not counted from a survey', () => {
 		);
 		expect(res.status).toBe(200);
 		expect(await page('/b/pot')).toContain('owes $50');
+	});
+});
+
+describe('[15] the rivalry card leads with the name, not the humans', () => {
+	// [9] left two pairings in place, one of them with a commissioner ruling on
+	// the rivalry name — which is a settled value the board must print as the
+	// card's title.
+	it('uses the agreed rivalry name as the headline', async () => {
+		const html = await page('/b/rivalry');
+		expect(html).toContain('rh__name');
+		// Owners are still on the card, just no longer the title.
+		expect(html).toContain('pair-foot');
+		expect(html).toContain('Nikhil Nehra');
+	});
+
+	it('weaves each half of the header from a team colour', async () => {
+		const html = await page('/b/rivalry');
+
+		// Two boxes with a gap, each carrying a tiling houndstooth as a data URI.
+		expect(html).toContain('rh__half--a');
+		expect(html).toContain('rh__half--b');
+		expect(html).toContain('data:image/svg+xml');
+
+		/* Nobody has picked colours yet, so both sides are the placeholder grey.
+		   The generator reads two greys as a collision and answers with a coarser
+		   tile on side b — which is the only thing separating the halves until
+		   the survey lands, so it is worth pinning. */
+		expect(html).toContain('--s-l:28px 28px');
+		expect(html).toContain('--s-l:42px 42px');
+	});
+
+	it('renders both themes up front rather than waiting for JavaScript', async () => {
+		// The Worker cannot know the reader's theme, so it ships both and lets a
+		// media query choose. A board that only shipped one would flash.
+		const html = await page('/b/rivalry');
+		expect(html).toContain('--i-l:');
+		expect(html).toContain('--i-d:');
+	});
+
+	it('names a rivalry that has not been named yet rather than leaving a gap', async () => {
+		const html = await page('/b/rivalry');
+		expect(html).toMatch(/Still unnamed|rh__name/);
+	});
+});
+
+describe('[16] a bet and a forfeit are optional', () => {
+	let pairingId: string;
+
+	beforeAll(async () => {
+		await setStatus(cookie, 'rivalry', 'open');
+		const res = await api(
+			'/api/desk/pairings',
+			{ pairs: [['lyon-burns', 'dhruv-nandwani']], source: 'manual' },
+			{ cookie }
+		);
+		expect(res.status).toBe(200);
+		pairingId = (res.body.pairings as { id: string }[])[0].id;
+	});
+
+	const settle = (playerId: string, fieldKey: string, value: string) =>
+		api('/api/surveys/rivalry/negotiation', {
+			pairingId,
+			playerId,
+			fieldKey,
+			proposal: value,
+			pick: value
+		});
+
+	it('accepts "there is not one" on a money line without calling it invalid', async () => {
+		// The money guard must not reject the one answer that means "no amount".
+		const a = await settle('lyon-burns', 'bet', 'None');
+		const b = await settle('dhruv-nandwani', 'bet', 'none');
+		expect(a.status).toBe(200);
+		expect(b.status).toBe(200);
+	});
+
+	it('draws nothing at all when they agreed to nothing at all', async () => {
+		await settle('lyon-burns', 'side', 'None');
+		await settle('dhruv-nandwani', 'side', 'None');
+
+		const html = await page('/b/rivalry');
+		// Not a sentence explaining the absence, and certainly not a "not set"
+		// that would read as a card which failed to load. Just the name, the
+		// teams and the two of them.
+		expect(html).not.toContain('Pride only');
+		expect(html).not.toMatch(/No (bet|side punishment)\./);
+	});
+
+	it('lets the one line they did agree stand on its own', async () => {
+		await settle('lyon-burns', 'side', 'Loser changes their team name to LOSER');
+		await settle('dhruv-nandwani', 'side', 'Loser changes their team name to LOSER');
+
+		const html = await page('/b/rivalry');
+		expect(html).toContain('Loser changes their team name to LOSER');
+		// The bet they agreed not to have is not mentioned — a rivalry with only
+		// a forfeit reads as a rivalry that is about the forfeit.
+		expect(html).not.toMatch(/No bet\./);
 	});
 });

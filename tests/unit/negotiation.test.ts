@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fieldStatus, type Entry } from '../../src/lib/negotiation';
+import { fieldStatus, heatFrom, type Entry } from '../../src/lib/negotiation';
 
 /**
  * The rivalry mechanic. Agreement is DERIVED from two independently-written
@@ -102,5 +102,20 @@ describe('deriving agreement', () => {
 		expect(fieldStatus('rname', mine, theirs).state).toBe('agreed');
 		expect(fieldStatus('bet', mine, theirs).state).toBe('waiting');
 		expect(fieldStatus('side', mine, theirs).state).toBe('open');
+	});
+});
+
+describe('heatFrom', () => {
+	// Heat sets how hard the VS clashes and how often, so the cap is what keeps
+	// a fully settled rivalry from hammering away at the reader.
+	it('is the settled count, capped at three', () => {
+		expect(heatFrom(0)).toBe(0);
+		expect(heatFrom(2)).toBe(2);
+		expect(heatFrom(3)).toBe(3);
+		expect(heatFrom(9)).toBe(3);
+	});
+
+	it('never goes negative', () => {
+		expect(heatFrom(-1)).toBe(0);
 	});
 });

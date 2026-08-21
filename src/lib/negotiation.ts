@@ -19,6 +19,25 @@ import { norm } from './text';
 export type Entry = { field_key: string; proposal: string | null; pick: string | null };
 export type Ruling = { field_key: string; value: string };
 
+/* ── "We agreed there isn't one" ──────────────────────────────────────────────
+   A bet and a side punishment are both OPTIONAL, and two people deciding to
+   have neither is a settled outcome — not an unanswered question. Those are
+   different things and the board says so differently, so they cannot share the
+   empty state.
+
+   Nothing is a value like any other here: both sides pick NONE, and the same
+   "do the two rows match?" rule that settles every other line settles this one
+   too. No flag, no special case in the agreement logic, and either side can
+   change their mind by picking something else.
+
+   Matched through `norm`, so somebody typing "none" into the box means exactly
+   what the button means. */
+export const NONE = 'None';
+
+export function isNone(value: string | null | undefined): boolean {
+	return value !== null && value !== undefined && norm(value) === norm(NONE);
+}
+
 export type FieldState = {
 	/** forced = commissioner ruling · agreed = both picked the same · waiting =
 	    one or both have picked but they differ · open = nobody has picked */
@@ -89,3 +108,18 @@ export const STATE_LABEL: Record<FieldState['state'], string> = {
 	waiting: 'In dispute',
 	open: 'Not set'
 };
+
+/* ── Heat ──────────────────────────────────────────────────────── */
+
+/**
+ * How lit this rivalry is, 0–3, from how much of it the two of them have
+ * actually settled.
+ *
+ * Settled rather than disputed is the deliberate choice: an argument is not a
+ * rivalry, a signed bet is. A pair who have agreed a name, a bet AND a side
+ * punishment are locked in and get the hardest clash; a pair who have agreed
+ * nothing sit perfectly still, and the stillness is the nag.
+ */
+export function heatFrom(settled: number): number {
+	return Math.max(0, Math.min(3, settled));
+}

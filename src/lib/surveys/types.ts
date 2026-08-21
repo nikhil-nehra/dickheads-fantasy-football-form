@@ -142,6 +142,20 @@ export type NegotiationQuestion = Base & {
 		prompt: string;
 		help: string;
 		placeholder: string;
+		/**
+		 * What this line actually holds, which decides how it is captured and
+		 * how the board prints it.
+		 *
+		 *   'name'  — the rivalry's name. The board puts it on the title card, so
+		 *             it is deliberately NOT repeated in the card body.
+		 *   'money' — a dollar amount and nothing else. Captured with a number
+		 *             input and normalised on write, so "20" and "$20" are the
+		 *             same answer rather than a permanent disagreement.
+		 *   'text'  — prose. Gets the room prose needs.
+		 *
+		 * Defaults to 'text' when omitted.
+		 */
+		kind?: 'name' | 'money' | 'text';
 	}[];
 };
 

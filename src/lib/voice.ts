@@ -253,3 +253,21 @@ export const PAID_UP = 'Everyone has paid. Genuinely, well done — this has nev
 /** Before the commissioner has marked anyone. */
 export const NOBODY_MARKED =
 	'Nobody is marked paid yet. Either the season has not started or the commissioner has not been to the Desk.';
+
+/* ── The rivalry cards ──────────────────────────────────────── */
+
+export const RIVALRY = {
+	/** Where the agreed name goes, before there is one. */
+	unnamed: 'Still unnamed',
+
+
+	/**
+	 * What the flames mean, for a tooltip and for a screen reader — the icons
+	 * are decoration, this is the sentence that carries the information.
+	 */
+	heat(n: number): string {
+		if (n >= 3) return 'Fully settled — name, bet and side punishment all agreed. This one is on.';
+		if (n === 2) return 'Two of three lines agreed. Nearly on.';
+		return 'One line agreed. Barely warm.';
+	}
+} as const;

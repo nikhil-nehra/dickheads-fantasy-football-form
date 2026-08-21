@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import type { NegotiationQuestion } from '$lib/surveys/types';
-	import { fieldStatus, type Entry, type Ruling } from '$lib/negotiation';
+	import { NONE, fieldStatus, isNone, type Entry, type Ruling } from '$lib/negotiation';
 
 	type Negotiation = {
 		pairingId: string;
@@ -134,14 +134,34 @@
 				<p class="q-help">{f.help}</p>
 
 				<label for="prop-{f.key}">Your proposal</label>
-				<textarea
-					id="prop-{f.key}"
-					rows="2"
-					{disabled}
-					placeholder={f.placeholder}
-					value={draft(f.key)}
-					oninput={(e) => (drafts[f.key] = e.currentTarget.value)}
-				></textarea>
+				{#if f.kind === 'money'}
+					<!-- A bet is an amount, so it gets an amount field: a numeric
+					     keypad on a phone, and no way to type a sentence into a line
+					     the board prints as a figure. -->
+					<span class="money-input">
+						<span aria-hidden="true">$</span>
+						<input
+							id="prop-{f.key}"
+							type="number"
+							min="0"
+							step="1"
+							inputmode="decimal"
+							{disabled}
+							placeholder={f.placeholder}
+							value={draft(f.key).replace(/^\$/, '')}
+							oninput={(e) => (drafts[f.key] = e.currentTarget.value)}
+						/>
+					</span>
+				{:else}
+					<textarea
+						id="prop-{f.key}"
+						rows="2"
+						{disabled}
+						placeholder={f.placeholder}
+						value={draft(f.key)}
+						oninput={(e) => (drafts[f.key] = e.currentTarget.value)}
+					></textarea>
+				{/if}
 
 				<p class="rival-line">
 					<strong>{firstName}'s proposal:</strong>
@@ -151,6 +171,16 @@
 				{#if !disabled}
 					<fieldset class="picks">
 						<legend>Which are you backing?</legend>
+						<!-- Both of these lines are optional, and agreeing there isn't one
+						     is a real answer rather than a blank. It has to be pickable, or
+						     "we're not betting" is indistinguishable from "neither of us has
+						     got round to it". -->
+						<button
+							class="pick pick--none"
+							class:pick--on={isNone(st.myPick)}
+							disabled={busy === f.key}
+							onclick={() => lockIn(f.key, NONE)}
+						>There isn't one</button>
 						{#if draft(f.key).trim()}
 							<button
 								class="pick"
@@ -203,6 +233,33 @@
 {/if}
 
 <style>
+	/* "There isn't one" is a real answer, so it looks like the other picks
+	   rather than like a way out of answering. */
+	.pick--none {
+		font-style: italic;
+	}
+
+	.pick--on {
+		border-color: var(--ok);
+		box-shadow: inset 0 0 0 1px var(--ok);
+	}
+
+	/* The currency mark belongs to the field, not to the value — typing over an
+	   amount should never mean re-typing a "$". */
+	.money-input {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 3px;
+		font-family: var(--font-display);
+		font-size: var(--t-lg);
+	}
+
+	.money-input input {
+		width: 7ch;
+		font: inherit;
+		font-variant-numeric: tabular-nums;
+	}
+
 	.vs {
 		position: relative;
 		overflow: hidden;

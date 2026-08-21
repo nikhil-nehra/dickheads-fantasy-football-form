@@ -17,6 +17,7 @@ import {
 	readSleeper,
 	resolveVictim,
 	type SleeperDraft,
+	type SleeperUser,
 	type StandingsRow
 } from '$lib/server/sleeper';
 import { CHALLENGE_CLOSES, daysOut, draftOrder, leagueTime } from '$lib/draft';
@@ -57,6 +58,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		const rulings = await listRulings(db);
 		const def = surveyById(board.from);
 		const negQ = def ? allQuestions(def).find((q) => q.type === 'negotiation') : undefined;
+		const negFields = negQ && negQ.type === 'negotiation' ? negQ.fields : [];
 
 		// The punishment verdict, and — where Sleeper can settle it — who is
 		// actually on the hook for it. Three of the five options are now a
@@ -134,15 +136,40 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 			}
 		}
 
+		/* The card now leads with the TEAM, and names the human underneath — a
+		   rivalry is between two franchises, and "Team Chaos vs The Bus Crew"
+		   carries more than two people's legal names. The team name comes from
+		   Sleeper (its own, or the handle if they never set one) and falls back
+		   to the roster name for anybody not linked yet, so the header is never
+		   blank. */
+		const sleeperUsers = (await readSleeper<SleeperUser[]>(db, 'users')) ?? [];
+		const teamOf = new Map(sleeperUsers.map((u) => [u.userId, u.teamName || u.displayName]));
+		const linkOf = new Map(players.map((p) => [p.id, p.sleeper_user_id]));
+
+		const teamFor = (playerId: string): string | null => {
+			const userId = linkOf.get(playerId);
+			return userId ? (teamOf.get(userId) ?? null) : null;
+		};
+
 		return {
 			...base,
 			kind: 'rivalry' as const,
 			verdict,
-			fields: negQ && negQ.type === 'negotiation' ? negQ.fields : [],
+			/* The name field is deliberately NOT in `fields`: it belongs to the
+			   title card, and shipping it would put a "Rivalry name" row's label
+			   in the page's hydration payload for a row that is never drawn.
+			   `nameKey` is sent instead so the header stays data-driven rather
+			   than hardcoding this survey's key. */
+			nameKey: negFields.find((f) => f.kind === 'name')?.key ?? null,
+			fields: negFields
+				.filter((f) => f.kind !== 'name')
+				.map((f) => ({ key: f.key, short: f.short, kind: f.kind ?? 'text' })),
 			pairings: pairings.map((p) => ({
 				id: p.id,
 				aName: nameOf.get(p.a_player_id) ?? p.a_player_id,
 				bName: nameOf.get(p.b_player_id) ?? p.b_player_id,
+				aTeam: teamFor(p.a_player_id),
+				bTeam: teamFor(p.b_player_id),
 				a: entries.filter((e) => e.pairing_id === p.id && e.player_id === p.a_player_id),
 				b: entries.filter((e) => e.pairing_id === p.id && e.player_id === p.b_player_id),
 				rulings: rulings.filter((r) => r.pairing_id === p.id)

@@ -3,6 +3,8 @@ import type { RequestHandler } from './$types';
 import { surveyById } from '$lib/surveys';
 import { allQuestions } from '$lib/surveys/types';
 import { saveNegotiation, rateLimited } from '$lib/server/db';
+import { normaliseMoney } from '$lib/money';
+import { NONE, isNone } from '$lib/negotiation';
 
 const MAX_FIELD = 500;
 
@@ -29,7 +31,8 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 		return json({ error: 'bad_request' }, { status: 400 });
 	}
 
-	if (!negQ.fields.some((f) => f.key === body.fieldKey)) {
+	const field = negQ.fields.find((f) => f.key === body.fieldKey);
+	if (!field) {
 		return json({ error: 'unknown_field' }, { status: 400 });
 	}
 
@@ -37,6 +40,35 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 		const t = (v ?? '').trim();
 		return t.length ? t.slice(0, MAX_FIELD) : null;
 	};
+
+	/* A money line is normalised to one canonical string before it is stored.
+	   Agreement on a line is derived by comparing the two sides' answers, so
+	   without this one player typing "20" and the other "$20" would disagree
+	   forever about a number they had both already agreed on. */
+	const clean = (v: string | null | undefined) => {
+		const t = trim(v);
+		if (t === null) return t;
+		// "There isn't one" is a settled answer on any line, including a money
+		// line, so it is canonicalised rather than validated as an amount.
+		if (isNone(t)) return NONE;
+		if (field.kind !== 'money') return t;
+		return normaliseMoney(t);
+	};
+
+	if (field.kind === 'money') {
+		for (const v of [body.proposal, body.pick]) {
+			const t = trim(v);
+			if (t !== null && !isNone(t) && normaliseMoney(t) === null) {
+				return json(
+					{
+						error: 'not_money',
+						message: `${field.short} is a dollar amount. Put anything the loser has to DO in the side punishment.`
+					},
+					{ status: 422 }
+				);
+			}
+		}
+	}
 
 	if (await rateLimited(db, `neg:${body.playerId}`, 30, 60)) {
 		return json({ error: 'rate_limited', message: 'Slow down a moment.' }, { status: 429 });
@@ -54,8 +86,8 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 			pairingId: body.pairingId,
 			fieldKey: body.fieldKey!,
 			playerId: body.playerId,
-			proposal: trim(body.proposal),
-			pick: trim(body.pick)
+			proposal: clean(body.proposal),
+			pick: clean(body.pick)
 		},
 		{ bypassStatus: locals.isCommissioner }
 	);

@@ -114,6 +114,7 @@ export const rivalry: SurveyDefinition = {
 							key: 'rname',
 							tag: 'RIVALRY NAME',
 							short: 'Rivalry name',
+							kind: 'name',
 							prompt: 'What is this rivalry called?',
 							help:
 								'The name that goes on the Rivalry Board and in the league chat forever. Make it hurt.',
@@ -123,15 +124,17 @@ export const rivalry: SurveyDefinition = {
 							key: 'bet',
 							tag: 'THE SET BET',
 							short: 'The bet',
-							prompt: 'What are the two of you betting on rivalry week?',
+							kind: 'money',
+							prompt: 'How much is on your head-to-head?',
 							help:
-								'The actual stake on your head-to-head matchup. Money, favours, dignity — your call, as long as you both agree.',
-							placeholder: 'e.g. Loser Venmos the winner $20 and posts the receipt'
+								'A dollar amount, paid by the loser to the winner. Anything you want the loser to **do** goes in the side punishment below.',
+							placeholder: '20'
 						},
 						{
 							key: 'side',
 							tag: 'SIDE PUNISHMENT',
 							short: 'Side punishment',
+							kind: 'text',
 							prompt: 'What does the loser of your matchup have to do?',
 							help:
 								'Separate from the league-wide punishment. This one is just between you two.',

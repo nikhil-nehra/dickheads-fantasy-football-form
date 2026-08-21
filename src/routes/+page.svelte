@@ -248,6 +248,9 @@
 	}
 
 	.tile :global(.tile-go) {
+		flex: 0 0 auto;
+		/* Optically level with the cap-height of the first line, not the box. */
+		margin-top: 3px;
 		color: var(--accent-ink);
 		transition: transform var(--dur-2) var(--ease);
 	}
@@ -301,20 +304,25 @@
 		transform: translateY(0) scale(0.995);
 	}
 
+	/* Deliberately NOT flex-wrap: wrap. Wrapping let a two-line title push the
+	   chevron onto a line of its own, where it read as a stray character rather
+	   than as the tile's affordance. The title shrinks instead, and the chevron
+	   stays put beside its first line. */
 	.tile-head {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		justify-content: space-between;
 		gap: var(--s-2);
 		margin-bottom: 2px;
-		flex-wrap: wrap;
 	}
 
 	.tile-title {
+		min-width: 0;
 		font-family: var(--font-display);
 		text-transform: uppercase;
 		font-size: var(--t-base);
 		line-height: 1.15;
+		text-wrap: balance;
 	}
 
 	/* No rule above it and no padding either side of one: the row reads as the
