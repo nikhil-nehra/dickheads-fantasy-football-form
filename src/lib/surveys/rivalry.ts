@@ -51,6 +51,8 @@ const PUNISHMENTS = [
 	'Go on an e-date. Though a discord dating server',
 	'8 hours in a bowling alley, every strike is -15min every gutter ball is +15min',
 	'Re-take the SAT, need a 1100 or better or you redo it',
+	'Go door to door trying to get people to join your fake cult',
+	'Trick or Treat in January',
 	'Send a dick pic to the league, straight up.',
 ];
 

@@ -148,8 +148,7 @@ describe('[4] closing is enforced by the server', () => {
 describe('[5] boards outlive their survey', () => {
 	// The Pot used to be the board tested here, back when it was a readout of
 	// the intake survey. It no longer reads a survey at all, so the assertion
-	// moved to the board that still does: the Rivalry Board publishes the
-	// punishment verdict, which is a settled ruling rather than a tally.
+	// moved to a board that still does.
 	it('serves board data while the survey is closed', async () => {
 		const html = await page('/b/rivalry');
 		expect(html).toContain('The Rivalry Board');
@@ -169,6 +168,72 @@ describe('[5] boards outlive their survey', () => {
 		expect(html).toMatch(/property="og:title"/);
 		expect(html).toMatch(/property="og:image"/);
 		expect(html).toMatch(/name="twitter:card"/);
+	});
+});
+
+describe('[5b] the punishment board', () => {
+	/* A ruling, not a tally. The board reads no survey at all — the same
+	   correction The Pot had — so these assertions are about what a
+	   commissioner set, never about what the ballot currently says. */
+	it('says so plainly before anybody has ruled', async () => {
+		const html = await page('/b/punishment');
+		expect(html).toContain('The Punishment');
+		expect(html).toContain('No punishment set yet');
+	});
+
+	it('publishes no vote counts, ever', async () => {
+		const html = await page('/b/punishment');
+		expect(html).not.toContain('The ballot');
+		expect(html).not.toMatch(/\d+ pts/);
+	});
+
+	it('refuses a ruling from a stranger', async () => {
+		const res = await api('/api/desk/punishment', { punishment: 'Nice try' });
+		expect(res.status).toBe(403);
+	});
+
+	it('prints all four terms once the commissioner rules', async () => {
+		const res = await api(
+			'/api/desk/punishment',
+			{
+				punishment: '24 straight hours inside an IHOP',
+				victim: 'Last place, toilet bowl',
+				deadline: 'The Super Bowl',
+				instructions: 'One photo an hour, timestamped, or the clock resets.'
+			},
+			{ cookie }
+		);
+		expect(res.status).toBe(200);
+
+		const html = await page('/b/punishment');
+		expect(html).toContain('24 straight hours inside an IHOP');
+		expect(html).toContain('Last place, toilet bowl');
+		expect(html).toContain('The Super Bowl');
+		expect(html).toContain('One photo an hour');
+		expect(html).not.toContain('No punishment set yet');
+	});
+
+	it('falls back to the standing deadline when one is not given', async () => {
+		// "By the Super Bowl" is the league's rule, not a field somebody has to
+		// remember to fill in every season.
+		const res = await api(
+			'/api/desk/punishment',
+			{ punishment: 'Crack stud', deadline: '   ' },
+			{ cookie }
+		);
+		expect(res.status).toBe(200);
+		expect((res.body as { ruling: { deadline: string } }).ruling.deadline).toBe('The Super Bowl');
+	});
+
+	it('outlives its survey like every other board', async () => {
+		// Archived by [5] just above, and it still renders the ruling.
+		expect(await page('/b/punishment')).toContain('Crack stud');
+	});
+
+	it('keeps the verdict off the Rivalry Board', async () => {
+		const rivalry = await page('/b/rivalry');
+		expect(rivalry).toContain('The Rivalry Board');
+		expect(rivalry).not.toContain('RULING');
 	});
 });
 

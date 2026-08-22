@@ -3,7 +3,7 @@
 	import PinPad from '$lib/components/PinPad.svelte';
 	import SurveyTally from '$lib/components/SurveyTally.svelte';
 	import { STATUS_META, ALL_STATUSES } from '$lib/status';
-	import { fieldStatus, ownValue } from '$lib/negotiation';
+	import { fieldStatus, isNone, ownValue } from '$lib/negotiation';
 	import { autoPair } from '$lib/pairing';
 	import { confidence } from '$lib/sleeperMatch';
 	import type { SurveyStatus } from '$lib/server/db';
@@ -11,6 +11,16 @@
 	import { allQuestions } from '$lib/surveys/types';
 	import { reduced } from '$lib/motion';
 	import { MAX_SLICES, payouts } from '$lib/pot';
+	import {
+		DEFAULT_DEADLINE,
+		EMPTY_RULING,
+		MAX_DEADLINE,
+		MAX_INSTRUCTIONS,
+		MAX_PUNISHMENT,
+		MAX_VICTIM,
+		type PunishmentRuling
+	} from '$lib/punishment';
+	import { ballotTally } from '$lib/tally';
 	import Icon from '$lib/components/Icon.svelte';
 
 	let { data } = $props();
@@ -96,6 +106,12 @@
 	let negFields = $derived(rivalryFields.filter((f) => f.mode !== 'own'));
 	let ownFields = $derived(rivalryFields.filter((f) => f.mode === 'own'));
 
+	/** One player's answer on one line, in words rather than in storage terms. */
+	function sideAnswer(pick: string | null): string {
+		if (!pick) return 'nothing yet';
+		return isNone(pick) ? 'wants none' : pick;
+	}
+
 	// Beef rankings feed the auto-pair suggestion.
 	let beef = $derived.by(() => {
 		if (!data.authed) return {};
@@ -167,6 +183,39 @@
 		} finally {
 			marking = '';
 		}
+	}
+
+	/* ── The punishment ─────────────────────────────────────────────────────
+	   Owned by the form once seeded, exactly like the pot editor above and for
+	   the same reason: reseeding on every invalidateAll would throw away
+	   whatever is half-typed. */
+	let pun = $state<PunishmentRuling>({ ...EMPTY_RULING });
+	let punLoaded = $state(false);
+
+	$effect(() => {
+		if (!data.authed || punLoaded) return;
+		pun = { ...data.punishment };
+		punLoaded = true;
+	});
+
+	/* The vote, as advice. The commissioner still types the sentence, because
+	   a tie has to be broken by somebody and the winning wording is often not
+	   the wording you want printed. */
+	let ballotLeader = $derived.by(() => {
+		if (!data.authed || !rivalrySurvey) return null;
+		const q = allQuestions(rivalrySurvey.def).find((x) => x.type === 'ballot');
+		if (!q || q.type !== 'ballot') return null;
+		const opts = rivalrySurvey.ballots[q.id] ?? [];
+		const rows = ballotTally(q, rivalrySurvey.submissions, new Map(opts.map((o) => [o.id, o.text])));
+		return rows[0] ?? null;
+	});
+
+	function useLeader() {
+		if (ballotLeader) pun.punishment = ballotLeader.label;
+	}
+
+	function savePunishment() {
+		return post('/api/desk/punishment', { ...pun }, 'punishment set');
 	}
 
 	function savePot() {
@@ -277,6 +326,12 @@
 				aria-selected={tab === 'rivalries'}
 				class:on={tab === 'rivalries'}
 				onclick={() => (tab = 'rivalries')}>Rivalries</button
+			>
+			<button
+				role="tab"
+				aria-selected={tab === 'punishment'}
+				class:on={tab === 'punishment'}
+				onclick={() => (tab = 'punishment')}>The Punishment</button
 			>
 			<button
 				role="tab"
@@ -402,12 +457,20 @@
 									</div>
 
 									{#if st.value}
-										<p class="settled">{st.value}</p>
+										<!-- A pair who agreed there is no bet have settled it, and the
+										     Desk has to say so in words. Printed raw this was the
+										     literal string "None", which reads as a bug. -->
+										<p class="settled" class:settled--none={isNone(st.value)}>
+											{isNone(st.value) ? (f.optional?.none ?? "There isn't one.") : st.value}
+										</p>
 									{/if}
 
+									<!-- Each side's answer, once. It used to print
+									     "$35 (backing $35)" for every line: `proposal` and `pick`
+									     were two steps of a negotiation that no longer has two
+									     steps, and they now always hold the same value. -->
 									<p class="faint">
-										{p.aName}: {st.myProposal ?? '—'} (backing {st.myPick ?? '—'}) ·
-										{p.bName}: {st.theirProposal ?? '—'} (backing {st.theirPick ?? '—'})
+										{p.aName}: {sideAnswer(st.myPick)} · {p.bName}: {sideAnswer(st.theirPick)}
 									</p>
 
 									<div class="row">
@@ -465,7 +528,7 @@
 												{#if hex}
 													<span class="swatch" style="--c:{hex}"></span>{hex}{' '}
 												{:else}
-													<span>— </span>
+													<span>{f.short.toLowerCase()} not set{' '}</span>
 												{/if}
 											{/each}
 										</p>
@@ -475,6 +538,53 @@
 						</div>
 					{/each}
 				{/if}
+			</section>
+		{:else if tab === 'punishment'}
+			<section class="card">
+				<h2 class="display">The Punishment</h2>
+				<p class="q-help">
+					What the league is held to, as you rule it. The ballot on the Rivalry Week tab is
+					where you read the vote; this is where you say what it came to. It goes straight to
+					<a href="/b/punishment">The Punishment board</a>, which publishes no votes and no
+					counts.
+				</p>
+
+				{#if ballotLeader}
+					<p class="notice">
+						The ballot currently has <strong>{ballotLeader.label}</strong> in front on
+						{ballotLeader.points} points.
+						<button class="btn btn--ghost btn--sm" onclick={useLeader}>Use it</button>
+					</p>
+				{/if}
+
+				<label class="pun-field">
+					<span class="down-tag">The punishment</span>
+					<textarea rows="2" maxlength={MAX_PUNISHMENT} bind:value={pun.punishment}
+						placeholder="24 straight hours inside an IHOP"></textarea>
+				</label>
+
+				<label class="pun-field">
+					<span class="down-tag">Who does it</span>
+					<input type="text" maxlength={MAX_VICTIM} bind:value={pun.victim}
+						placeholder="Last place, toilet bowl" />
+				</label>
+
+				<label class="pun-field">
+					<span class="down-tag">Done by</span>
+					<input type="text" maxlength={MAX_DEADLINE} bind:value={pun.deadline}
+						placeholder={DEFAULT_DEADLINE} />
+				</label>
+
+				<label class="pun-field">
+					<span class="down-tag">The instructions</span>
+					<textarea rows="8" maxlength={MAX_INSTRUCTIONS} bind:value={pun.instructions}
+						placeholder="How it is done, and what counts as proof. Line breaks survive."
+					></textarea>
+				</label>
+
+				<button class="btn btn--primary" disabled={!!busy} onclick={savePunishment}>
+					Publish the ruling
+				</button>
 			</section>
 		{:else if tab === 'pot'}
 			<section class="card">
@@ -1013,6 +1123,22 @@
 		margin-bottom: var(--s-3);
 	}
 
+	.pun-field {
+		display: block;
+		margin-bottom: var(--s-4);
+	}
+
+	.pun-field .down-tag {
+		display: inline-block;
+		margin-bottom: var(--s-2);
+	}
+
+	.pun-field textarea,
+	.pun-field input {
+		width: 100%;
+		margin: 0;
+	}
+
 	.line {
 		padding: var(--s-3);
 		margin-bottom: var(--s-2);
@@ -1043,6 +1169,14 @@
 
 	.line-head .down-tag {
 		margin: 0;
+	}
+
+	/* Settled at nothing is still settled, but it is not a value and should not
+	   be shouted like one. */
+	.settled--none {
+		font-weight: 600;
+		font-style: italic;
+		color: var(--ink-soft);
 	}
 
 	.settled {

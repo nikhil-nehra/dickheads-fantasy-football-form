@@ -5,23 +5,23 @@ import { surveyById } from '$lib/surveys';
 import { allQuestions } from '$lib/surveys/types';
 import {
 	listPlayers,
-	listResponses,
-	listBallotOptions,
 	listPairings,
 	listNegotiation,
 	listRulings,
 	getPotConfig,
+	getPunishment,
 	listPayments
 } from '$lib/server/db';
 import {
 	readSleeper,
-	resolveVictim,
 	type SleeperDraft,
 	type SleeperUser,
 	type StandingsRow
 } from '$lib/server/sleeper';
 import { CHALLENGE_CLOSES, daysOut, draftOrder, leagueTime } from '$lib/draft';
 import { ledger, payouts } from '$lib/pot';
+import { SUPER_BOWL_KICKOFF, isRuled, isStandingDeadline } from '$lib/punishment';
+import { atRisk, recordOf } from '$lib/standings';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    "Surveys close. Boards are forever."
@@ -49,6 +49,59 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		roster: players.map((p) => ({ id: p.id, display_name: p.display_name }))
 	};
 
+	/* ── The Punishment ──────────────────────────────────────────────────────
+	   A ruling, not a tally. Note what this branch does NOT read: the ballot,
+	   the victim vote, or a single response row.
+
+	   It used to read all three and print them live — points moving under the
+	   reader, a victim column that changed as people voted, a roast for whoever
+	   had not. That is a survey readout wearing a board's clothes, and nobody
+	   serves a punishment that is still being counted. The vote decides it on
+	   the Desk, where the tally belongs and where the commissioner reads it; what
+	   the league is HELD TO is four facts somebody set and can be quoted on.
+
+	   The same correction The Pot had already had, for the same reason. */
+	if (board.id === 'punishment') {
+		const ruling = await getPunishment(db, season);
+
+		/* A clock only where there is a moment to count to. The deadline is
+		   free text — "by the Super Bowl" is what the league agreed, not a
+		   timestamp — so the constant is used exactly when the commissioner has
+		   left the standing deadline in place, and the words stand alone
+		   otherwise. Counting down to a kickoff under the words "Week 18" would
+		   be a confident lie. */
+		const known = isStandingDeadline(ruling.deadline);
+
+		/* Who is on the hook AS IT STANDS. Live from Sleeper, and deliberately not
+		   the same claim as `ruling.victim`: that is the RULE ("last place,
+		   toilet bowl"), this is the table underneath it today. Empty until
+		   somebody has played a game — in August every row is 0-0-0, and sorting
+		   that would accuse whoever happens to come first of losing a season
+		   nobody has played. */
+		const standings = (await readSleeper<StandingsRow[]>(db, 'standings')) ?? [];
+
+		return {
+			...base,
+			kind: 'punishment' as const,
+			ruling,
+			ruled: isRuled(ruling),
+			atRisk: atRisk(standings).map((r) => ({
+				rosterId: r.rosterId,
+				name: r.displayName,
+				record: recordOf(r),
+				pointsFor: r.pointsFor
+			})),
+			// Server time, rendered as-is on the first client pass too, so
+			// hydration has nothing to disagree about. See the draft board.
+			now: Date.now(),
+			deadlineAt: known ? SUPER_BOWL_KICKOFF : null,
+			/* Formatted here rather than in the browser so a reader in another
+			   timezone sees the same words as everyone in Dallas — and with the
+			   year, because "Feb 14" seventeen months out is a question. */
+			deadlineLabel: known ? leagueTime(SUPER_BOWL_KICKOFF, { year: true }) : null
+		};
+	}
+
 	if (board.id === 'rivalry') {
 		const pairings = await listPairings(db, season);
 		const entries = await listNegotiation(
@@ -59,82 +112,6 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		const def = surveyById(board.from);
 		const negQ = def ? allQuestions(def).find((q) => q.type === 'negotiation') : undefined;
 		const negFields = negQ && negQ.type === 'negotiation' ? negQ.fields : [];
-
-		// The punishment verdict, and — where Sleeper can settle it — who is
-		// actually on the hook for it. Three of the five options are now a
-		// straight read off the standings instead of a January argument.
-		let verdict: {
-			punishment: string | null;
-			target: string;
-			targetLabel: string;
-			who: string | null;
-		} | null = null;
-
-		if (def) {
-			const rows = await listResponses(db, def.id);
-			const submissions = rows.map((r) => {
-				try {
-					return JSON.parse(r.answers) as Record<string, unknown>;
-				} catch {
-					return {};
-				}
-			});
-
-			const ballotQ = allQuestions(def).find((q) => q.type === 'ballot');
-			const targetQ = allQuestions(def).find((q) => q.type === 'single');
-
-			let punishment: string | null = null;
-			if (ballotQ && ballotQ.type === 'ballot') {
-				const opts = await listBallotOptions(db, def.id, ballotQ.id);
-				const text = new Map(opts.map((o) => [o.id, o.text]));
-				const points = new Map<string, number>();
-				for (const a of submissions) {
-					const podium = a[ballotQ.id];
-					if (!Array.isArray(podium)) continue;
-					podium.forEach((id: string, i: number) =>
-						points.set(id, (points.get(id) ?? 0) + (ballotQ.points[i] ?? 0))
-					);
-				}
-				const winner = [...points.entries()].sort((x, y) => y[1] - x[1])[0];
-				punishment = winner ? (text.get(winner[0]) ?? null) : null;
-			}
-
-			if (targetQ && targetQ.type === 'single') {
-				const counts = new Map<string, number>();
-				for (const a of submissions) {
-					const choice = (a[targetQ.id] as { choice?: string } | undefined)?.choice;
-					if (choice) counts.set(choice, (counts.get(choice) ?? 0) + 1);
-				}
-				const top = [...counts.entries()].sort((x, y) => y[1] - x[1])[0];
-				if (top) {
-					const standings = await readSleeper<StandingsRow[]>(db, 'standings');
-					const brackets = await readSleeper<{ losers?: { r?: number; l?: number }[] }>(
-						db,
-						'brackets'
-					);
-					const nameOfRoster = (rosterId: number) =>
-						standings?.find((s) => s.rosterId === rosterId)?.displayName ?? `Roster ${rosterId}`;
-
-					const resolved = resolveVictim(
-						top[0],
-						standings,
-						brackets?.losers ?? null,
-						nameOfRoster
-					);
-					const declared = targetQ.options.find((o) => o.id === top[0]);
-					verdict = {
-						punishment,
-						target: top[0],
-						targetLabel: declared?.label ?? resolved.label,
-						who: resolved.who
-					};
-				}
-			}
-
-			if (!verdict && punishment) {
-				verdict = { punishment, target: '', targetLabel: '', who: null };
-			}
-		}
 
 		/* The card now leads with the TEAM, and names the human underneath — a
 		   rivalry is between two franchises, and "Team Chaos vs The Bus Crew"
@@ -154,7 +131,6 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		return {
 			...base,
 			kind: 'rivalry' as const,
-			verdict,
 			/* The name field is deliberately NOT in `fields`: it belongs to the
 			   title card, and shipping it would put a "Rivalry name" row's label
 			   in the page's hydration payload for a row that is never drawn.

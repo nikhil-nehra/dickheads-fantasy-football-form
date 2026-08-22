@@ -12,6 +12,7 @@ import {
 	recentAudit,
 	ensureSurveys,
 	getPotConfig,
+	getPunishment,
 	listPayments
 } from '$lib/server/db';
 import { pairingProblems } from '$lib/pairing';
@@ -34,12 +35,13 @@ export const load: PageServerLoad = async ({ platform, locals }) => {
 		SURVEYS.map((s) => s.id)
 	);
 
-	const [players, states, pairings, rulings, audit] = await Promise.all([
+	const [players, states, pairings, rulings, audit, punishment] = await Promise.all([
 		listPlayers(db),
 		listSurveyStates(db),
 		listPairings(db, season),
 		listRulings(db),
-		recentAudit(db, 30)
+		recentAudit(db, 30),
+		getPunishment(db, season)
 	]);
 
 	const nameOf = new Map(players.map((p) => [p.id, p.display_name]));
@@ -148,6 +150,7 @@ export const load: PageServerLoad = async ({ platform, locals }) => {
 		})),
 		negotiation: entries,
 		rulings,
+		punishment,
 		problems: pairingProblems(
 			players.map((p) => p.id),
 			pairings.map((p) => [p.a_player_id, p.b_player_id] as [string, string])

@@ -184,12 +184,15 @@ export function daysOut(from: number, to: number): number {
  * the reader in another timezone sees the same words as everyone else and
  * hydration has nothing to disagree about.
  */
-export function leagueTime(ms: number): string {
+export function leagueTime(ms: number, opts: { year?: boolean } = {}): string {
 	return new Intl.DateTimeFormat('en-US', {
 		timeZone: LEAGUE_TZ,
 		weekday: 'short',
 		month: 'short',
 		day: 'numeric',
+		// Off by default: the draft is weeks away and the year is noise. On for
+		// anything far enough out that "Feb 14" alone is a question.
+		year: opts.year ? 'numeric' : undefined,
 		hour: 'numeric',
 		minute: '2-digit',
 		timeZoneName: 'short'

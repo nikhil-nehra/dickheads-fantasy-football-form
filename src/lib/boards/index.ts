@@ -24,6 +24,22 @@ export type BoardDefinition = {
 
 export const BOARDS: BoardDefinition[] = [
 	{
+		id: 'punishment',
+		title: 'The Punishment',
+		// The verdict used to be a banner on top of the Rivalry Board, which
+		// made two unrelated things share one link: a league-wide sentence
+		// nobody votes on twice, and fourteen private arguments that change
+		// every day. They are separate questions and now separate boards.
+		// `from` is where the idea came from, for display. The board itself reads
+		// no survey at all — see the loader.
+		from: 'rivalry',
+		blurb: 'What last place has to do, who has to do it, by when, and exactly how.',
+		og: {
+			title: 'The Punishment',
+			description: 'The sentence, the victim, the deadline and the rules. No appeals.'
+		}
+	},
+	{
 		id: 'rivalry',
 		title: 'The Rivalry Board',
 		from: 'rivalry',
@@ -31,7 +47,7 @@ export const BOARDS: BoardDefinition[] = [
 			'Every agreed rivalry name, bet and side forfeit. This is the one to paste in Sleeper.',
 		og: {
 			title: 'The Rivalry Board',
-			description: 'Every rivalry name, bet and side forfeit — settled, ruled or still in dispute.'
+			description: 'Every rivalry name, bet and side forfeit, settled, ruled or still in dispute.'
 		}
 	},
 	{

@@ -9,6 +9,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import RivalryHeader from '$lib/components/RivalryHeader.svelte';
 	import type { TeamColors } from '$lib/rivalryPattern';
+	import { recordOf, seasonStarted, worstFirst } from '$lib/standings';
 
 	/* ── Team colours ────────────────────────────────────────────────────────
 	   Both picked in the rivalry survey, on a line with no second side to
@@ -145,10 +146,15 @@
 	   render use the timestamp the loader stamped — so hydration has nothing to
 	   disagree about. After that the reader's own clock takes over. */
 	let tick = $state<number | null>(null);
-	let now = $derived(tick ?? (data.kind === 'draft' ? data.now : 0));
+	/* Narrowed inline rather than through a boolean: `data.now` only exists on
+	   the two kinds that carry a clock, and a `ticking` flag hides that from the
+	   compiler instead of proving it. */
+	let now = $derived(
+		tick ?? (data.kind === 'draft' || data.kind === 'punishment' ? data.now : 0)
+	);
 
 	$effect(() => {
-		if (data.kind !== 'draft') return;
+		if (data.kind !== 'draft' && data.kind !== 'punishment') return;
 		tick = Date.now();
 		const id = setInterval(() => (tick = Date.now()), 1000);
 		return () => clearInterval(id);
@@ -156,6 +162,12 @@
 
 	let toDraft = $derived(
 		data.kind === 'draft' && data.startsAt ? countdown(now, data.startsAt) : null
+	);
+
+	/* The one deadline the league actually agreed: before kickoff, not before
+	   the final whistle. */
+	let toKickoff = $derived(
+		data.kind === 'punishment' && data.deadlineAt ? countdown(now, data.deadlineAt) : null
 	);
 
 	let toChallenge = $derived(
@@ -177,11 +189,11 @@
 			: null
 	);
 
-	// Fewest wins, then fewest points — the same order every league table uses
-	// to decide who is genuinely last rather than merely unlucky.
+	// One definition of "worst", shared with the victim resolver and The
+	// Punishment board. Nobody is in the cellar before a game has been played.
 	let cellar = $derived.by(() => {
 		if (data.kind !== 'standings' || !data.standings?.length) return null;
-		return [...data.standings].sort((a, b) => a.wins - b.wins || a.pointsFor - b.pointsFor)[0];
+		return seasonStarted(data.standings) ? worstFirst(data.standings)[0] : null;
 	});
 
 	/* ── Link preview ─────────────────────────────────────────────────────── */
@@ -289,23 +301,100 @@
 			<p class="roast">{unpaid ?? PAID_UP}</p>
 		{/if}
 
-		{#if data.kind === 'rivalry'}
-			{#if data.verdict?.punishment}
+		{#if data.kind === 'punishment'}
+			{#if data.ruled}
 				<div class="verdict">
 					<div class="down-tag red"><Icon name="flag" size={13} /> The punishment</div>
-					<p class="verdict-text display">{data.verdict.punishment}</p>
-					{#if data.verdict.targetLabel}
-						<p class="q-help">
-							Served by: <strong>{data.verdict.targetLabel}</strong>
-							{#if data.verdict.who}
-								— currently <strong>{data.verdict.who}</strong>, per Sleeper. Sleep well.
-							{/if}
-						</p>
-					{/if}
+					<p class="verdict-text display">{data.ruling.punishment}</p>
 					<span class="stamp" aria-hidden="true">RULING{'\n'}STANDS</span>
 				</div>
-			{/if}
 
+				<!-- Who, and by when. Two facts, side by side, because the second one
+				     is the half people forget and then argue about in February. -->
+				<dl class="terms">
+					{#if data.ruling.victim}
+						<div class="term">
+							<dt>Who does it</dt>
+							<dd>{data.ruling.victim}</dd>
+						</div>
+					{/if}
+					<div class="term">
+						<dt>Done by</dt>
+						<dd>{data.ruling.deadline}</dd>
+					</div>
+				</dl>
+
+				{#if toKickoff && data.deadlineLabel}
+					<div class="clock clock--deadline" class:clock--live={toKickoff.done}>
+						<div class="down-tag red">
+							<Icon name="stopwatch" size={13} />
+							{toKickoff.done ? 'Time is up' : 'Left to serve it'}
+						</div>
+
+						{#if toKickoff.done}
+							<p class="clock-live display">KICKOFF</p>
+						{:else}
+							<div class="dials nums" aria-hidden="true">
+								<span class="dial"><b>{toKickoff.days}</b><i>days</i></span>
+								<span class="dial"><b>{pad(toKickoff.hours)}</b><i>hrs</i></span>
+								<span class="dial"><b>{pad(toKickoff.minutes)}</b><i>min</i></span>
+								<span class="dial"><b>{pad(toKickoff.seconds)}</b><i>sec</i></span>
+							</div>
+							<!-- The dials are decoration for a screen reader; this is the
+							     sentence it actually reads. -->
+							<p class="sr-only" aria-live="polite">
+								{toKickoff.days} days, {toKickoff.hours} hours and {toKickoff.minutes} minutes
+								left to serve the punishment.
+							</p>
+						{/if}
+
+						<p class="clock-when display">{data.deadlineLabel}</p>
+						<p class="q-help">
+							{toKickoff.done
+								? 'Kickoff has been and gone. Either it happened or it did not.'
+								: 'Before the Super Bowl kicks off. Not during, not after.'}
+						</p>
+					</div>
+				{/if}
+
+				<!-- ── Who is losing, right now ─────────────────────────────────
+				     Live from Sleeper, and a different claim from "who does it"
+				     above: that is the rule, this is the table underneath it
+				     today. Nobody is named until somebody has played a game. -->
+				{#if data.atRisk.length}
+					<section class="risk">
+						<h3 class="risk-head">Most at risk</h3>
+						<p class="q-help">{lastPlaceNote(data.atRisk[0].name)}</p>
+						<ol class="risk-list">
+							{#each data.atRisk as team, i (team.rosterId)}
+								<li class="risk-row" class:risk-row--worst={i === 0}>
+									<span class="risk-rank nums" aria-hidden="true">{i + 1}</span>
+									<span class="risk-name">{team.name}</span>
+									<span class="risk-record nums">
+										{team.record}
+										<span class="faint">{team.pointsFor.toFixed(1)} PF</span>
+									</span>
+								</li>
+							{/each}
+						</ol>
+					</section>
+				{/if}
+
+				{#if data.ruling.instructions}
+					<section class="rules">
+						<h3 class="rules-head">The instructions</h3>
+						<!-- Whitespace preserved, so a commissioner who types a numbered
+						     list gets a numbered list. It is still escaped text — nothing
+						     here builds markup out of data. -->
+						<p class="rules-body">{data.ruling.instructions}</p>
+					</section>
+				{/if}
+			{:else}
+				<p class="empty">{EMPTY.noPunishment}</p>
+			{/if}
+		{/if}
+
+		{#if data.kind === 'rivalry'}
 			{#if data.pairings.length === 0}
 				<p class="empty">{EMPTY.noPairings}</p>
 			{/if}
@@ -740,6 +829,145 @@
 		color: var(--ink-soft);
 		font-size: var(--t-sm);
 		text-align: center;
+	}
+
+	/* The draft board's clock, borrowed whole. It is the same object — a moment
+	   in the future the league is measured against — so it gets the same
+	   treatment rather than a second design that means the same thing. */
+	.clock--deadline {
+		margin-top: var(--s-4);
+	}
+
+	/* ── Most at risk ────────────────────────────────────────────────────────
+	   A short list, not the whole table — the Standings board is one tab away
+	   and this is only here to put a face on the sentence above it. The worst is
+	   marked once and in the danger colour, because that is the entire point of
+	   the section. */
+	.risk {
+		margin-top: var(--s-5);
+	}
+
+	.risk-head {
+		font-family: var(--font-display);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		font-size: var(--t-md);
+		margin: 0 0 var(--s-1);
+	}
+
+	.risk-list {
+		list-style: none;
+		margin: var(--s-3) 0 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+	}
+
+	.risk-row {
+		display: flex;
+		align-items: center;
+		gap: var(--s-3);
+		padding: var(--s-2) var(--s-3);
+		border-radius: var(--r-md);
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+	}
+
+	.risk-row--worst {
+		border-color: var(--danger);
+		background: var(--danger-soft);
+	}
+
+	.risk-rank {
+		flex: 0 0 auto;
+		width: 2ch;
+		text-align: right;
+		font-family: var(--font-display);
+		color: var(--ink-faint);
+	}
+
+	.risk-row--worst .risk-rank {
+		color: var(--danger);
+	}
+
+	.risk-name {
+		flex: 1 1 auto;
+		min-width: 0;
+		font-weight: 700;
+		overflow-wrap: anywhere;
+	}
+
+	.risk-record {
+		flex: 0 0 auto;
+		text-align: right;
+		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
+		font-size: var(--t-sm);
+	}
+
+	.risk-record .faint {
+		display: block;
+		font-size: var(--t-xs);
+	}
+
+	/* ── The terms ───────────────────────────────────────────────────────────
+	   Who and by when, as a definition list, because that is what they are. Side
+	   by side on anything wider than a phone so the deadline is never below the
+	   fold of the fact it qualifies. */
+	.terms {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+		gap: var(--s-3);
+		margin: var(--s-4) 0 0;
+	}
+
+	.term {
+		padding: var(--s-3) var(--s-4);
+		border-radius: var(--r-md);
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+	}
+
+	.term dt {
+		font-size: var(--t-xs);
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--ink-soft);
+		margin-bottom: var(--s-1);
+	}
+
+	.term dd {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: var(--t-md);
+		line-height: 1.25;
+		overflow-wrap: anywhere;
+	}
+
+	.rules {
+		margin-top: var(--s-5);
+	}
+
+	.rules-head {
+		font-family: var(--font-display);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		font-size: var(--t-md);
+		margin: 0 0 var(--s-2);
+	}
+
+	/* `pre-wrap`, so a list typed as a list survives the trip to the board. */
+	.rules-body {
+		margin: 0;
+		padding: var(--s-4);
+		border-radius: var(--r-md);
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+		white-space: pre-wrap;
+		line-height: 1.6;
+		overflow-wrap: anywhere;
 	}
 
 	.verdict {

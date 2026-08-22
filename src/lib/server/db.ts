@@ -85,6 +85,7 @@ import { norm } from '../text';
 export { norm };
 
 import { EMPTY_POT, parsePot, type PaymentRow, type PotConfig } from '../pot';
+import { EMPTY_RULING, parseRuling, type PunishmentRuling } from '../punishment';
 
 /* ── Players ─────────────────────────────────────────────────────────────── */
 
@@ -353,6 +354,46 @@ export async function setPotConfig(
 			   updated_by = excluded.updated_by`
 		)
 		.bind(season, config.buyIn, JSON.stringify(config.split), by)
+		.run();
+}
+
+/* ── The punishment ──────────────────────────────────────────────────────── */
+
+/**
+ * The season's ruling. An absent row means nobody has ruled yet, which the
+ * board renders as such rather than as a punishment with blanks in it.
+ */
+export async function getPunishment(db: D1Database, season: string): Promise<PunishmentRuling> {
+	const row = await db
+		.prepare(
+			'SELECT punishment, victim, deadline, instructions FROM punishment_config WHERE season = ?'
+		)
+		.bind(season)
+		.first<PunishmentRuling>();
+	return row ? parseRuling(row) : EMPTY_RULING;
+}
+
+/** One upsert, like every other mutation here — nothing to read-modify-write. */
+export async function setPunishment(
+	db: D1Database,
+	season: string,
+	ruling: PunishmentRuling,
+	by: string
+): Promise<void> {
+	await db
+		.prepare(
+			`INSERT INTO punishment_config
+			   (season, punishment, victim, deadline, instructions, updated_at, updated_by)
+			 VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'), ?6)
+			 ON CONFLICT(season) DO UPDATE SET
+			   punishment   = excluded.punishment,
+			   victim       = excluded.victim,
+			   deadline     = excluded.deadline,
+			   instructions = excluded.instructions,
+			   updated_at   = excluded.updated_at,
+			   updated_by   = excluded.updated_by`
+		)
+		.bind(season, ruling.punishment, ruling.victim, ruling.deadline, ruling.instructions, by)
 		.run();
 }
 

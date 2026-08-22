@@ -84,6 +84,8 @@ export const EMPTY = {
 		"Sleeper hasn't handed over any data yet. Either the season hasn't started or the commissioner hasn't wired it up.",
 	noResponses: 'Not one response. Fourteen grown adults, zero of them capable of clicking a link.',
 	noPunishments: 'Nobody has suggested a punishment. Somehow that is worse than a bad one.',
+	noPunishment:
+		'No punishment set yet. The vote is in the commissioner’s hands, and the commissioner is taking their time.',
 	notPicked: 'Pick your name to get started. Yes, your actual one.',
 	noDraftDate:
 		"Sleeper hasn't been given a draft time yet. Set one in the Sleeper app and it turns up here on its own.",

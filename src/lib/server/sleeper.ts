@@ -1,3 +1,5 @@
+import { worstFirst } from '../standings';
+
 /* ═══════════════════════════════════════════════════════════════════════════
    SLEEPER — read side
    ═══════════════════════════════════════════════════════════════════════════
@@ -112,18 +114,13 @@ export function resolveVictim(
 	losersBracket: { w?: number; l?: number; r?: number }[] | null,
 	rosterName: (rosterId: number) => string
 ): VictimResolution {
-	const by = <T>(rows: T[], cmp: (a: T, b: T) => number): T | null =>
-		rows.length ? [...rows].sort(cmp)[0] : null;
-
 	switch (targetId) {
 		case 'reg-last': {
-			const worst = by(
-				standings ?? [],
-				(a, b) => a.wins - b.wins || a.pointsFor - b.pointsFor
-			);
+			// One definition of "worst", shared with the boards. See $lib/standings.
+			const worst = worstFirst(standings ?? [])[0] ?? null;
 			return {
 				targetId,
-				label: 'Last place — regular season',
+				label: 'Last place, regular season',
 				who: worst ? worst.displayName : null
 			};
 		}
@@ -135,7 +132,7 @@ export function resolveVictim(
 			const final = rounds.find((m) => (m.r ?? 0) === finalRound && m.l != null);
 			return {
 				targetId,
-				label: 'Last place — toilet bowl',
+				label: 'Last place, toilet bowl',
 				who: final?.l != null ? rosterName(final.l) : null
 			};
 		}
