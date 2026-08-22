@@ -169,14 +169,23 @@
 		{@const shown = section.questions.filter(visible)}
 		{#if shown.length}
 			<div class="section">
-				<!-- The chain gang: the marker moves up as each section arrives. -->
-				<div class="down-tag">
-					<Icon name="marker" size={13} class="icon--advance" />
-					{section.tag}
+				<!-- Every section carried a `title` that nothing rendered, so the
+				     only thing marking a new question was an 11px mono chip and
+				     24px of air — at a glance one long scroll rather than three
+				     questions. The head is now a block you cannot scroll past
+				     without noticing: chain marker, the down, the title at
+				     heading size, and the yard line above it. -->
+				<div class="sec-head">
+					<!-- The chain gang: the marker moves up as each section arrives. -->
+					<div class="down-tag">
+						<Icon name="marker" size={13} class="icon--advance" />
+						{section.tag}
+					</div>
+					<h3 class="display sec-title">{section.title}</h3>
+					{#if section.blurb}
+						<p class="q-help sec-blurb"><RichText text={section.blurb} /></p>
+					{/if}
 				</div>
-				{#if section.blurb}
-					<p class="q-help"><RichText text={section.blurb} /></p>
-				{/if}
 
 				{#each shown as q (q.id)}
 					{#if q.type === 'negotiation'}
@@ -255,6 +264,49 @@
 {/if}
 
 <style>
+	/* The global `.section` is a 1px dashed hairline and 24px of padding, which
+	   is the right weight inside a board where the rows are all one kind of
+	   thing. Between two questions it is not enough: you finish one and the
+	   next is already under your thumb. Scoped here rather than raised into
+	   app.css, because widening it globally would push the boards and the Desk
+	   apart for a problem they do not have. */
+	.section {
+		position: relative;
+		border-top: 0;
+		padding: var(--s-7) 0 var(--s-6);
+	}
+
+	/* The yard line. Solid rather than dashed, and gold for the first 40px —
+	   directly under the down marker, so the eye lands on the tick and reads
+	   right into "2ND DOWN". Same gold-capped-panel language as `.card::before`,
+	   at the scale of one question. */
+	.section::before {
+		content: '';
+		position: absolute;
+		inset: 0 0 auto;
+		height: 2px;
+		border-radius: 2px;
+		background: linear-gradient(90deg, var(--gold) 0 40px, var(--border-strong) 40px);
+	}
+
+	/* The gap that does the actual work: the head is nearer the rule above it
+	   than it is to its own question, so a question reads as one block with a
+	   title on top rather than as a continuous column. */
+	.sec-head {
+		margin-bottom: var(--s-5);
+	}
+
+	.sec-title {
+		font-size: var(--t-lg);
+		line-height: 1.1;
+		text-wrap: balance;
+	}
+
+	.sec-blurb {
+		margin-top: var(--s-2);
+		margin-bottom: 0;
+	}
+
 	.penalty {
 		flex: 0 0 auto;
 		display: inline-flex;

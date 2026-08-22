@@ -114,7 +114,9 @@ export const intake: SurveyDefinition = {
 				{
 					id: 'beef',
 					type: 'rank',
-					prompt: 'Rivalry Selection',
+					/* The section is already titled "Rivalry Selection"; repeating it
+					   here left the question with no prompt of its own. */
+					prompt: 'Who do you have the most beef with?',
 					feeds: [{ label: 'Rivalry pairings — the suggested draw', deskTab: 'rivalries' }],
 					help:
 						'This is for **rivalry week** (the last week of the season) — there may even be a mini group punishment or payout for the losing side of each rivalry. ' +

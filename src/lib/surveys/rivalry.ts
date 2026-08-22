@@ -35,10 +35,16 @@ import type { SurveyDefinition } from './types';
    `importFrom` is deliberately NOT set on this question any more. Pointing it
    back at the intake would re-add all thirteen raw strings alongside these,
    and each near-duplicate would sit on the ballot competing with its own
-   cleaned-up version. Nothing is closed off by that: write-ins are still open,
-   so anything missing joins the pool the moment somebody adds it.
+   cleaned-up version.
 
-   These are commissioner options, so they render first, marked ★.
+   Nor is there a write-in any more. This list already IS the write-ins —
+   everybody got their say in the intake, and the editing above is the whole
+   point of asking again. A box that adds a fourteenth idea mid-vote also means
+   the people who ranked first ranked a different ballot from the people who
+   ranked last, and there is no honest way to total that. The pool is fixed
+   before the first vote, which is what makes the scores comparable.
+
+   These are the ballot, and the whole of it.
    ────────────────────────────────────────────────────────────────────────── */
 const PUNISHMENTS = [
 	'Run the Milk Mile',
@@ -68,7 +74,7 @@ export const rivalry: SurveyDefinition = {
 	sections: [
 		{
 			id: 'punishment',
-			tag: '1ST DOWN · THE PUNISHMENT',
+			tag: '1ST DOWN',
 			title: 'The punishment',
 			questions: [
 				{
@@ -79,18 +85,13 @@ export const rivalry: SurveyDefinition = {
 						{ label: 'The Punishment — the sentence', href: '/b/punishment', deskTab: 'punishment' }
 					],
 					help:
-						'Tap in order. First tap is your 1st choice, worth **3 points**, then 2, then 1. Missing yours? Write it in.',
+						'Tap in order. First tap is your 1st choice, worth **3 points**, then 2, then 1.',
 					required: true,
 					podiumSize: 3,
 					// A half-filled podium is a quieter vote than a full one, and looks
 					// identical to the person casting it. All three, or it does not count.
 					minPicks: 3,
 					points: [3, 2, 1],
-					writeIn: {
-						label: 'Not on the list? Add one',
-						placeholder: 'Your own diabolical suggestion. It joins the ballot for everyone.',
-						maxLength: 400
-					},
 					commissionerOptions: PUNISHMENTS
 				}
 			]
@@ -98,7 +99,7 @@ export const rivalry: SurveyDefinition = {
 
 		{
 			id: 'victim',
-			tag: '2ND DOWN · THE VICTIM',
+			tag: '2ND DOWN',
 			title: 'The victim',
 			questions: [
 				{
@@ -138,7 +139,7 @@ export const rivalry: SurveyDefinition = {
 
 		{
 			id: 'negotiation',
-			tag: '3RD DOWN · RIVALRY WEEK',
+			tag: '3RD DOWN',
 			title: 'Your rivalry',
 			blurb:
 				'Write your answer, or take your rival’s. A line settles when **you both have the same thing**. ' +

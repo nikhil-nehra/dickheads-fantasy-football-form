@@ -3,6 +3,7 @@ import {
 	atRisk,
 	played,
 	recordOf,
+	riskState,
 	seasonStarted,
 	winRate,
 	worstFirst
@@ -95,5 +96,41 @@ describe('writing a record down', () => {
 
 	it('includes them when there are', () => {
 		expect(recordOf(team('A', 3, 9, 1))).toBe('3-9-1');
+	});
+});
+
+/**
+ * The At Risk section is a standing part of The Punishment board now, not a
+ * footnote inside a ruling, so it is on screen for the whole preseason with
+ * nothing to show. What it says then is the entire question.
+ */
+describe('riskState', () => {
+	it('lists once somebody has played', () => {
+		const rows = [team('Bad', 1, 4), team('Good', 4, 1), team('Mid', 2, 3)];
+		expect(riskState(rows)).toBe('listed');
+	});
+
+	it('is preseason while every row is 0-0-0', () => {
+		/* The rows are there and the sort would happily return one of them
+		   first. Printing that would accuse whoever sorts first of losing a
+		   season nobody has played — in August that is pure defamation by
+		   tiebreak. */
+		const rows = [team('A', 0, 0), team('B', 0, 0), team('C', 0, 0)];
+		expect(riskState(rows)).toBe('preseason');
+	});
+
+	it('is unwired when Sleeper has handed over nothing at all', () => {
+		/* The distinction that earns this function. An empty table and an
+		   unplayed season render the same nothing, but one fixes itself with
+		   the calendar and the other needs somebody to go and connect the
+		   league — and a board that says "nobody has played" in November when
+		   the truth is "we were never plugged in" is lying with a straight
+		   face. */
+		expect(riskState([])).toBe('unwired');
+	});
+
+	it('does not call it preseason just because the bottom is cut short', () => {
+		// Fewer teams than the slice asks for is still a listed table.
+		expect(riskState([team('Only', 0, 1)], 3)).toBe('listed');
 	});
 });

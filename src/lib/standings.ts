@@ -64,6 +64,20 @@ export function atRisk<T extends Ranked>(rows: readonly T[], n = 3): T[] {
 	return seasonStarted(rows) ? worstFirst(rows).slice(0, n) : [];
 }
 
+/**
+ * Why the At Risk section has nothing to show — or that it does.
+ *
+ * Two silences that look identical on the page and mean opposite things:
+ * nobody has PLAYED yet, which is the calendar and fixes itself; and Sleeper
+ * has never been WIRED UP, which is a job for the commissioner and does not.
+ * A section that renders the same nothing for both hides the second one until
+ * somebody notices in November that the standings were never coming.
+ */
+export function riskState(rows: readonly Ranked[], n = 3): 'listed' | 'preseason' | 'unwired' {
+	if (rows.length === 0) return 'unwired';
+	return atRisk(rows, n).length ? 'listed' : 'preseason';
+}
+
 /** A record as it is written on a scoreboard. Ties omitted when there are none. */
 export function recordOf(r: Ranked): string {
 	return r.ties > 0 ? `${r.wins}-${r.losses}-${r.ties}` : `${r.wins}-${r.losses}`;

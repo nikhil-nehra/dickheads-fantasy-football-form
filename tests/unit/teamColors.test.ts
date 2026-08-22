@@ -132,6 +132,33 @@ describe('the rivalry survey wiring', () => {
 	});
 });
 
+describe('the punishment ballot', () => {
+	const podiumQ = allQuestions(rivalry).find((q) => q.id === 'podium');
+	if (!podiumQ || podiumQ.type !== 'ballot') throw new Error('no podium question');
+
+	it('is a closed ballot — no write-in, and nothing imported alongside it', () => {
+		/* Both halves matter together. A write-in would let a fourteenth option
+		   onto the ballot after some people had already ranked, so the early
+		   voters and the late voters would be scoring different ballots; and
+		   `importFrom` would re-add the thirteen raw intake strings next to the
+		   cleaned-up versions they were edited into, splitting each vote
+		   between an option and its own duplicate.
+
+		   The server side is already covered by this: the write-in endpoint
+		   rejects any question without a `writeIn`, so removing it here closes
+		   the API too rather than just hiding the box. */
+		expect(podiumQ.writeIn).toBeUndefined();
+		expect(podiumQ.importFrom).toBeUndefined();
+		expect(podiumQ.commissionerOptions?.length).toBeGreaterThan(podiumQ.podiumSize);
+	});
+
+	it('has no blank or duplicated options', () => {
+		const opts = podiumQ.commissionerOptions ?? [];
+		for (const o of opts) expect(o.trim().length).toBeGreaterThan(3);
+		expect(new Set(opts.map((o) => o.trim().toLowerCase())).size).toBe(opts.length);
+	});
+});
+
 describe('the victim question', () => {
 	const targetQ = allQuestions(rivalry).find((q) => q.id === 'target');
 	if (!targetQ || targetQ.type !== 'single') throw new Error('no target question');

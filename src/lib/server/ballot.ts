@@ -1,4 +1,10 @@
-import { ensureBallotOption, listResponses, listBallotOptions } from './db';
+import {
+	ensureBallotOption,
+	listResponses,
+	listBallotOptions,
+	pruneCommissionerOptions,
+	norm
+} from './db';
 import { allQuestions, type SurveyDefinition } from '$lib/surveys/types';
 import { surveyById } from '$lib/surveys';
 
@@ -18,11 +24,20 @@ import { surveyById } from '$lib/surveys';
    the database's job.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+export type BallotSync = {
+	added: number;
+	removed: number;
+	/** Options cut from the shortlist that a cast ballot still points at. */
+	kept: string[];
+};
+
 export async function syncBallotOptions(
 	db: D1Database,
 	def: SurveyDefinition
-): Promise<number> {
+): Promise<BallotSync> {
 	let added = 0;
+	let removed = 0;
+	const kept: string[] = [];
 
 	for (const q of allQuestions(def)) {
 		if (q.type !== 'ballot') continue;
@@ -63,8 +78,38 @@ export async function syncBallotOptions(
 			}
 		}
 
-		added += (await listBallotOptions(db, def.id, q.id)).length - before;
+		/* Then take the superseded shortlist back off — see src/lib/ballotPool.ts.
+
+		   After the inserts, never before, so an option that survived the edit is
+		   matched by its normalised text rather than deleted and re-created,
+		   which would hand it a new id and orphan every podium pointing at the
+		   old one. */
+		const ranked = new Set<string>();
+		for (const row of await listResponses(db, def.id)) {
+			let answers: Record<string, unknown>;
+			try {
+				answers = JSON.parse(row.answers);
+			} catch {
+				continue;
+			}
+			const podium = answers[q.id];
+			if (Array.isArray(podium)) {
+				for (const id of podium) if (typeof id === 'string') ranked.add(id);
+			}
+		}
+
+		const prune = await pruneCommissionerOptions(
+			db,
+			def.id,
+			q.id,
+			(q.commissionerOptions ?? []).map(norm),
+			ranked
+		);
+		removed += prune.removed;
+		kept.push(...prune.kept);
+
+		added += (await listBallotOptions(db, def.id, q.id)).length - before + prune.removed;
 	}
 
-	return added;
+	return { added, removed, kept };
 }

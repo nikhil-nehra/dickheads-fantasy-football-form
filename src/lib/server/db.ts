@@ -82,6 +82,7 @@ export const WRITABLE: SurveyStatus[] = ['open'];
 // Re-exported so server callers can reach it from one place, and imported so
 // this module can use it too — a bare re-export does not bind the name here.
 import { norm } from '../text';
+import { planPrune } from '../ballotPool';
 export { norm };
 
 import { EMPTY_POT, parsePot, type PaymentRow, type PotConfig } from '../pot';
@@ -320,6 +321,31 @@ export async function ensureBallotOption(
 		.bind(opt.surveyId, opt.questionId, n)
 		.first<{ id: string }>();
 	return row?.id ?? null;
+}
+
+/**
+ * Apply `planPrune` — see src/lib/ballotPool.ts for which options a shortlist
+ * edit may take back off, and why a ranked one is not among them.
+ *
+ * `keepNorm` is the surviving shortlist, already normalised. Returns the
+ * options that were cut but stayed, so the Desk can say why the pool still has
+ * them rather than let it look like a sync that failed.
+ */
+export async function pruneCommissionerOptions(
+	db: D1Database,
+	surveyId: string,
+	questionId: string,
+	keepNorm: readonly string[],
+	protectedIds: ReadonlySet<string>
+): Promise<{ removed: number; kept: string[] }> {
+	const rows = await listBallotOptions(db, surveyId, questionId);
+	const plan = planPrune(rows, keepNorm, protectedIds);
+
+	for (const row of plan.remove) {
+		await db.prepare('DELETE FROM ballot_option WHERE id = ?').bind(row.id).run();
+	}
+
+	return { removed: plan.remove.length, kept: plan.keep.map((r) => r.text) };
 }
 
 /* ── The pot ─────────────────────────────────────────────────────────────── */

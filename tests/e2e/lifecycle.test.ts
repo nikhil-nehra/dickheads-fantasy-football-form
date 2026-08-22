@@ -181,6 +181,30 @@ describe('[5b] the punishment board', () => {
 		expect(html).toContain('No punishment set yet');
 	});
 
+	it('carries the At Risk section whether or not anybody has ruled', async () => {
+		/* It used to be nested inside the ruling, so the one part of this board
+		   that is true all season was invisible for exactly the months when
+		   "who is losing" is still an open question. It is a section of the
+		   board in its own right now, and this is the assertion that keeps it
+		   one — note that no ruling has been set at this point in the run. */
+		const html = await page('/b/punishment');
+		expect(html).toContain('No punishment set yet');
+		expect(html).toContain('At Risk');
+	});
+
+	it('names nobody at risk, and says which silence it is', async () => {
+		/* Nothing seeds `sleeper_cache` in this harness, so the honest answer
+		   here is "Sleeper was never wired up" rather than "nobody has played" —
+		   two silences that look identical on the page and mean opposite things.
+		   Which one gets printed is decided by `riskState`, unit-tested across
+		   all three cases in tests/unit/standings.test.ts.
+
+		   The negative matters as much: no table, and no accusation. */
+		const html = await page('/b/punishment');
+		expect(html).toContain("Sleeper hasn't handed over any standings");
+		expect(html).not.toMatch(/Bottom \d+ of \d+/);
+	});
+
 	it('publishes no vote counts, ever', async () => {
 		const html = await page('/b/punishment');
 		expect(html).not.toContain('The ballot');
@@ -192,7 +216,7 @@ describe('[5b] the punishment board', () => {
 		expect(res.status).toBe(403);
 	});
 
-	it('prints all four terms once the commissioner rules', async () => {
+	it('prints the ruling once the commissioner rules', async () => {
 		const res = await api(
 			'/api/desk/punishment',
 			{
@@ -208,9 +232,50 @@ describe('[5b] the punishment board', () => {
 		const html = await page('/b/punishment');
 		expect(html).toContain('24 straight hours inside an IHOP');
 		expect(html).toContain('Last place, toilet bowl');
-		expect(html).toContain('The Super Bowl');
 		expect(html).toContain('One photo an hour');
 		expect(html).not.toContain('No punishment set yet');
+	});
+
+	it('states the standing deadline once, on the clock', async () => {
+		/* Ruled with the standing deadline just above. The clock counts to that
+		   exact kickoff and names it, so a "Done by: The Super Bowl" term six
+		   inches higher was the same fact printed twice. The countdown is the
+		   better of the two — it says how long is left, which the words cannot. */
+		const html = await page('/b/punishment');
+		expect(html).not.toContain('Done by');
+		expect(html).toContain('Feb 14, 2027');
+	});
+
+	it('falls back to the term when a custom deadline leaves no clock', async () => {
+		/* The other half, and the reason the term is conditional rather than
+		   deleted: a deadline the league typed itself is not a timestamp, so
+		   there is nothing to count down to and the words are the only statement
+		   of it there is. Dropping the term outright would have lost the
+		   deadline entirely on exactly the boards that need it spelled out. */
+		const res = await api(
+			'/api/desk/punishment',
+			{ punishment: '24 straight hours inside an IHOP', deadline: 'Week 18, before kickoff' },
+			{ cookie }
+		);
+		expect(res.status).toBe(200);
+
+		const html = await page('/b/punishment');
+		expect(html).toContain('Done by');
+		expect(html).toContain('Week 18, before kickoff');
+		// No clock, so no countdown chrome either.
+		expect(html).not.toContain('Left to serve it');
+
+		// Put the standing deadline back for the tests that follow.
+		await api(
+			'/api/desk/punishment',
+			{
+				punishment: '24 straight hours inside an IHOP',
+				victim: 'Last place, toilet bowl',
+				deadline: 'The Super Bowl',
+				instructions: 'One photo an hour, timestamped, or the clock resets.'
+			},
+			{ cookie }
+		);
 	});
 
 	it('falls back to the standing deadline when one is not given', async () => {
@@ -218,7 +283,7 @@ describe('[5b] the punishment board', () => {
 		// remember to fill in every season.
 		const res = await api(
 			'/api/desk/punishment',
-			{ punishment: 'Crack stud', deadline: '   ' },
+			{ punishment: 'Trick or Treat in January', deadline: '   ' },
 			{ cookie }
 		);
 		expect(res.status).toBe(200);
@@ -227,7 +292,7 @@ describe('[5b] the punishment board', () => {
 
 	it('outlives its survey like every other board', async () => {
 		// Archived by [5] just above, and it still renders the ruling.
-		expect(await page('/b/punishment')).toContain('Crack stud');
+		expect(await page('/b/punishment')).toContain('Trick or Treat in January');
 	});
 
 	it('keeps the verdict off the Rivalry Board', async () => {
@@ -650,21 +715,23 @@ describe('[11] the ballot pool', () => {
 		expect(html).not.toContain('Second thoughts, actually');
 	});
 
-	it('de-duplicates a write-in that already exists', async () => {
-		const first = await api('/api/surveys/rivalry/ballot', {
+	it('refuses a write-in, because this ballot no longer has one', async () => {
+		/* The box came off the page, and this is the half that matters: the
+		   endpoint keys off the question's own `writeIn`, so deleting it from
+		   the definition closes the API in the same edit. A hidden box with a
+		   live endpoint behind it would let anyone with curl put a fourteenth
+		   option on a ballot people have already ranked. */
+		const res = await api('/api/surveys/rivalry/ballot', {
 			questionId: 'podium',
 			text: 'Shave the eyebrows',
 			playerId: 'ryan-latin'
 		});
-		const again = await api('/api/surveys/rivalry/ballot', {
-			questionId: 'podium',
-			text: '  shave   THE eyebrows ',
-			playerId: 'lyon-burns'
-		});
-		expect(first.status).toBe(200);
-		expect(again.status).toBe(200);
-		// The same option, not a second one.
-		expect(again.body.id).toBe(first.body.id);
+		expect(res.status).toBe(400);
+		expect(res.body.error).toBe('unknown_question');
+
+		// And nothing landed in the pool.
+		const html = await page('/s/rivalry?as=nikhil-nehra');
+		expect(html).not.toContain('Shave the eyebrows');
 	});
 
 	it('rejects a ballot option id that does not exist', async () => {
@@ -678,20 +745,32 @@ describe('[11] the ballot pool', () => {
 
 describe('[12] rate limiting', () => {
 	it('throttles a burst from one player', async () => {
-		// The per-player ballot bucket is 10 a minute and is NOT raised for the
-		// test run, so this asserts the production value. Uses a player nothing
-		// else touches, so throttling them poisons no other test.
+		/* The per-player response bucket is 20 a minute and is NOT raised for
+		   the test run, so this asserts the production value. Uses a player
+		   nothing else touches, so throttling them poisons no other test.
+
+		   The bodies are deliberately junk: the limiter runs before validation,
+		   which is the point — a burst costs the same whether or not it would
+		   have saved anything. Everything under the limit comes back 422, and
+		   the throttle is the moment that changes.
+
+		   41, not 21, and the difference is the whole reason this comment
+		   exists. `rateLimited` buckets on `floor(now / windowSeconds)` — a
+		   FIXED window, not a sliding one — so a burst that straddles a minute
+		   boundary is counted as two separate bursts. 24 requests split 8/16
+		   trips nothing, which is exactly how this test failed once it was
+		   written with 24. Above 2×the limit the split cannot save it: some
+		   window has to receive 21. */
 		const results: number[] = [];
-		for (let i = 0; i < 14; i++) {
-			const res = await api('/api/surveys/rivalry/ballot', {
-				questionId: 'podium',
-				text: `burst option ${i}`,
-				playerId: 'david-moton'
+		for (let i = 0; i < 41; i++) {
+			const res = await api('/api/surveys/rivalry/response', {
+				playerId: 'david-moton',
+				answers: { podium: [`burst-${i}`] }
 			});
 			results.push(res.status);
 		}
 
-		expect(results.filter((s) => s === 200).length).toBeGreaterThan(0);
+		expect(results.filter((s) => s === 422).length).toBeGreaterThan(0);
 		expect(results).toContain(429);
 	});
 });

@@ -21,13 +21,13 @@ import {
 describe('normalising a ruling', () => {
 	it('trims every field', () => {
 		const r = parseRuling({
-			punishment: '  Crack stud  ',
+			punishment: '  Trick or Treat in January  ',
 			victim: ' Last place ',
 			deadline: ' Week 18 ',
 			instructions: '  Bring a witness.  '
 		});
 		expect(r).toEqual({
-			punishment: 'Crack stud',
+			punishment: 'Trick or Treat in January',
 			victim: 'Last place',
 			deadline: 'Week 18',
 			instructions: 'Bring a witness.'
@@ -69,7 +69,7 @@ describe('deciding whether there is anything to print', () => {
 		// — and the deadline is never blank, because it defaults.
 		expect(isRuled(parseRuling({ deadline: 'The Super Bowl' }))).toBe(false);
 		expect(isRuled(parseRuling({ instructions: 'Bring a witness.' }))).toBe(false);
-		expect(isRuled(parseRuling({ punishment: 'Crack stud' }))).toBe(true);
+		expect(isRuled(parseRuling({ punishment: 'Trick or Treat in January' }))).toBe(true);
 	});
 });
 

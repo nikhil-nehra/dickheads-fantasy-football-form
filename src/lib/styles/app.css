@@ -51,6 +51,13 @@
 	--accent-soft: #fff6da;
 	--danger: var(--endzone);
 	--danger-soft: var(--endzone-dim);
+	/* A rule drawn ON `--danger-soft`. Neither `--border` nor `--danger` works
+	   there: the first is cream and vanishes on the tint, the second is loud
+	   enough to read as a second box around whatever it separates. Tokenised
+	   rather than written as a literal, because the ground it sits on inverts
+	   between the themes and one fixed value can only be right on one of
+	   them. */
+	--danger-line: #e8b5be;
 	--ok: #1f7a45;
 	--ok-soft: #dff2e6;
 	/* The amber family — drafts, the name nag, anything "hold on a second". */
@@ -132,6 +139,7 @@
 		--accent-soft: #33280f;
 		--danger: #e2687c;
 		--danger-soft: #3a1b22;
+		--danger-line: #5c2f38;
 		--ok: #6ed69b;
 		--ok-soft: #14301f;
 		--warn: #f0c242;
@@ -157,6 +165,7 @@
 	--accent-soft: #33280f;
 	--danger: #e2687c;
 	--danger-soft: #3a1b22;
+	--danger-line: #5c2f38;
 	--ok: #6ed69b;
 	--ok-soft: #14301f;
 	--warn: #f0c242;

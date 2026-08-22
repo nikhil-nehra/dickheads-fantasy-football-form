@@ -30,12 +30,16 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 	const changed = await setSurveyStatus(db, def.id, body.status as SurveyStatus, 'commissioner');
 	if (!changed) return json({ error: 'unknown_survey' }, { status: 404 });
 
-	// Opening a survey is the natural moment to pull its ballot pool forward
-	// from whatever fed it.
-	let ballotAdded = 0;
+	/* Opening a survey is the natural moment to pull its ballot pool forward
+	   from whatever fed it — and, now, to take the superseded shortlist back
+	   off. `kept` is the one part worth surfacing: those are options the
+	   commissioner has cut that somebody has already ranked, so they stay on
+	   the ballot and the Desk should say so rather than let them look like a
+	   sync that failed. */
+	let ballot = { added: 0, removed: 0, kept: [] as string[] };
 	if (body.status === 'open') {
-		ballotAdded = await syncBallotOptions(db, def);
+		ballot = await syncBallotOptions(db, def);
 	}
 
-	return json({ ok: true, ballotAdded });
+	return json({ ok: true, ballotAdded: ballot.added, ballot });
 };

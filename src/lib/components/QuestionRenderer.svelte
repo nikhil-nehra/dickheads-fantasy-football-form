@@ -74,8 +74,15 @@
 </div>
 
 <style>
+	/* Sections carry a yard line; questions INSIDE a section carried nothing but
+	   24px, and the draft-availability section has three of them in a row. Same
+	   idea one weight down: a hairline, and enough air on both sides of it that
+	   the rule reads as a boundary rather than as underlining for the thing
+	   above it. */
 	.q + :global(.q) {
-		margin-top: var(--s-5);
+		margin-top: var(--s-6);
+		padding-top: var(--s-5);
+		border-top: 1px dashed var(--border);
 	}
 
 	.has-error {

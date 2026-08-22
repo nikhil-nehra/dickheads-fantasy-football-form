@@ -108,13 +108,20 @@
 		</li>
 	{/each}
 
+	<!-- Both empty states used to point at the write-in box. A ballot with no
+	     write-in has no box to point at, so they say what is actually true
+	     instead of instructing you to do something impossible. -->
 	{#if options.length === 0}
 		<li class="muted">
-			Nothing on the ballot yet. Write one in below and it joins the ballot for everyone.
+			{question.writeIn
+				? 'Nothing on the ballot yet. Write one in below and it joins the ballot for everyone.'
+				: 'Nothing on the ballot yet.'}
 		</li>
 	{:else if pool.length === 0}
 		<li class="muted">
-			That's the whole ballot so far. Write another one in below.
+			{question.writeIn
+				? "That's the whole ballot so far. Write another one in below."
+				: "That's the whole ballot."}
 		</li>
 	{/if}
 </ul>

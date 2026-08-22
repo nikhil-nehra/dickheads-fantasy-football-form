@@ -92,7 +92,13 @@ export const EMPTY = {
 	noRuns: 'Nobody has eaten a burger. Fourteen empty plates and one very disappointed commissioner.',
 	noBuyIn:
 		'The commissioner has not set the buy-in yet. Until he does, this is a league playing for pride.',
-	noSplit: 'No payout split set. Winner takes everything, apparently, including the argument.'
+	noSplit: 'No payout split set. Winner takes everything, apparently, including the argument.',
+	/* The At Risk section stands on its own now, so its silences have to speak.
+	   Two of them, and they mean opposite things: one is the calendar, the other
+	   is a job nobody has done. */
+	noRiskYet: 'Nobody has played a game. Everyone is 0-0 and everyone is innocent, for now.',
+	noRiskData:
+		"Sleeper hasn't handed over any standings, so there is nobody to name. Wire it up on the Desk."
 } as const;
 
 export const LOADING: readonly string[] = [

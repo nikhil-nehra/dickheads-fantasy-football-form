@@ -21,7 +21,7 @@ import {
 import { CHALLENGE_CLOSES, daysOut, draftOrder, leagueTime } from '$lib/draft';
 import { ledger, payouts } from '$lib/pot';
 import { SUPER_BOWL_KICKOFF, isRuled, isStandingDeadline } from '$lib/punishment';
-import { atRisk, recordOf } from '$lib/standings';
+import { atRisk, recordOf, riskState } from '$lib/standings';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    "Surveys close. Boards are forever."
@@ -77,20 +77,33 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		   toilet bowl"), this is the table underneath it today. Empty until
 		   somebody has played a game — in August every row is 0-0-0, and sorting
 		   that would accuse whoever happens to come first of losing a season
-		   nobody has played. */
+		   nobody has played.
+
+		   Which leaves two different silences, and the section has to tell them
+		   apart: nobody has PLAYED yet, and Sleeper has not been WIRED UP yet.
+		   One is the calendar and one is a job for the commissioner, and a
+		   section that renders the same nothing for both hides the second until
+		   somebody notices the standings are missing in November. */
 		const standings = (await readSleeper<StandingsRow[]>(db, 'standings')) ?? [];
+		const worst = atRisk(standings);
 
 		return {
 			...base,
 			kind: 'punishment' as const,
 			ruling,
 			ruled: isRuled(ruling),
-			atRisk: atRisk(standings).map((r) => ({
+			atRisk: worst.map((r) => ({
 				rosterId: r.rosterId,
 				name: r.displayName,
 				record: recordOf(r),
 				pointsFor: r.pointsFor
 			})),
+			// Named in $lib/standings alongside the definition of "worst", so the
+			// reason for a silence is decided in the same place as the ranking.
+			riskState: riskState(standings),
+			/* Out of how many. "Bottom 3" means nothing without it, and it is the
+			   difference between being last of fourteen and last of four. */
+			teamCount: standings.length,
 			// Server time, rendered as-is on the first client pass too, so
 			// hydration has nothing to disagree about. See the draft board.
 			now: Date.now(),

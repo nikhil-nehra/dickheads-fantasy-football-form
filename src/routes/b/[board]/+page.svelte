@@ -170,6 +170,13 @@
 		data.kind === 'punishment' && data.deadlineAt ? countdown(now, data.deadlineAt) : null
 	);
 
+	/* Whether the clock is on screen, which is the same question as "is the
+	   deadline already stated?" — asked once here rather than as the same
+	   two-part condition written twice. */
+	let deadlineOnClock = $derived(
+		data.kind === 'punishment' && !!toKickoff && !!data.deadlineLabel
+	);
+
 	let toChallenge = $derived(
 		data.kind === 'draft' ? countdown(now, data.challengeClosesAt) : null
 	);
@@ -303,68 +310,93 @@
 
 		{#if data.kind === 'punishment'}
 			{#if data.ruled}
+				<!-- ONE PANEL. What, who, and how long is left — the three things a
+				     reader is here for — on one ground instead of a red box beside a
+				     green one. The countdown was its own scoreboard panel because it was
+				     borrowed whole from the draft board, where the clock IS the page; here
+				     it is the deadline half of a ruling, so it drops the turf and sits in
+				     the ruling as a third term — one that happens to be counted rather
+				     than written. -->
 				<div class="verdict">
-					<div class="down-tag red"><Icon name="flag" size={13} /> The punishment</div>
 					<p class="verdict-text display">{data.ruling.punishment}</p>
 					<span class="stamp" aria-hidden="true">RULING{'\n'}STANDS</span>
-				</div>
 
-				<!-- Who, and by when. Two facts, side by side, because the second one
-				     is the half people forget and then argue about in February. -->
-				<dl class="terms">
-					{#if data.ruling.victim}
-						<div class="term">
-							<dt>Who does it</dt>
-							<dd>{data.ruling.victim}</dd>
-						</div>
-					{/if}
-					<div class="term">
-						<dt>Done by</dt>
-						<dd>{data.ruling.deadline}</dd>
-					</div>
-				</dl>
-
-				{#if toKickoff && data.deadlineLabel}
-					<div class="clock clock--deadline" class:clock--live={toKickoff.done}>
-						<div class="down-tag red">
-							<Icon name="stopwatch" size={13} />
-							{toKickoff.done ? 'Time is up' : 'Left to serve it'}
-						</div>
-
-						{#if toKickoff.done}
-							<p class="clock-live display">KICKOFF</p>
-						{:else}
-							<div class="dials nums" aria-hidden="true">
-								<span class="dial"><b>{toKickoff.days}</b><i>days</i></span>
-								<span class="dial"><b>{pad(toKickoff.hours)}</b><i>hrs</i></span>
-								<span class="dial"><b>{pad(toKickoff.minutes)}</b><i>min</i></span>
-								<span class="dial"><b>{pad(toKickoff.seconds)}</b><i>sec</i></span>
+					<dl class="terms">
+						{#if data.ruling.victim}
+							<div class="term">
+								<dt>Who does it</dt>
+								<dd>{data.ruling.victim}</dd>
 							</div>
-							<!-- The dials are decoration for a screen reader; this is the
-							     sentence it actually reads. -->
-							<p class="sr-only" aria-live="polite">
-								{toKickoff.days} days, {toKickoff.hours} hours and {toKickoff.minutes} minutes
-								left to serve the punishment.
-							</p>
 						{/if}
 
-						<p class="clock-when display">{data.deadlineLabel}</p>
-						<p class="q-help">
-							{toKickoff.done
-								? 'Kickoff has been and gone. Either it happened or it did not.'
-								: 'Before the Super Bowl kicks off. Not during, not after.'}
-						</p>
-					</div>
-				{/if}
+						<!-- "Done by" only when nothing else is saying it. With the standing
+						     deadline in force the countdown beside this counts to that exact
+						     kickoff and names it, so the term would be the same fact printed
+						     twice. A commissioner who types their own deadline ("Week 18") gets
+						     no countdown, and then this is the only place it appears — which is
+						     why it is a condition rather than a deletion. -->
+						{#if !deadlineOnClock}
+							<div class="term">
+								<dt>Done by</dt>
+								<dd>{data.ruling.deadline}</dd>
+							</div>
+						{/if}
 
-				<!-- ── Who is losing, right now ─────────────────────────────────
-				     Live from Sleeper, and a different claim from "who does it"
-				     above: that is the rule, this is the table underneath it
-				     today. Nobody is named until somebody has played a game. -->
-				{#if data.atRisk.length}
-					<section class="risk">
-						<h3 class="risk-head">Most at risk</h3>
-						<p class="q-help">{lastPlaceNote(data.atRisk[0].name)}</p>
+						{#if toKickoff && data.deadlineLabel}
+							<div class="term term--count" class:term--up={toKickoff.done}>
+								<dt>{toKickoff.done ? 'Time is up' : 'Left to serve it'}</dt>
+								<dd>
+									{#if toKickoff.done}
+										<span class="count-live display">KICKOFF</span>
+									{:else}
+										<span class="dials nums" aria-hidden="true">
+											<span class="dial"><b>{toKickoff.days}</b><i>days</i></span>
+											<span class="dial"><b>{pad(toKickoff.hours)}</b><i>hrs</i></span>
+											<span class="dial"><b>{pad(toKickoff.minutes)}</b><i>min</i></span>
+											<span class="dial"><b>{pad(toKickoff.seconds)}</b><i>sec</i></span>
+										</span>
+										<!-- The dials are decoration for a screen reader; this is the
+										     sentence it actually reads. -->
+										<span class="sr-only" aria-live="polite">
+											{toKickoff.days} days, {toKickoff.hours} hours and {toKickoff.minutes} minutes
+											left to serve the punishment.
+										</span>
+									{/if}
+
+									<span class="count-when">{data.deadlineLabel}</span>
+								</dd>
+							</div>
+						{/if}
+					</dl>
+				</div>
+			{:else}
+				<p class="empty">{EMPTY.noPunishment}</p>
+			{/if}
+
+			<!-- THE FOLLOW-THROUGH: how it is served, and who is currently on the
+			     hook to serve it. Also a pair, and also two things that were each
+			     a full-width band for content that never came close to filling one.
+
+			     At Risk stays OUTSIDE the ruled/unruled fork. It lived inside the
+			     ruling once, which meant the one part of this board that is true all
+			     season was invisible for the months before the vote closed — exactly
+			     the months when "who is losing" is still an open question. When it is
+			     the only thing in this band it takes the whole width; see
+			     `.serve > :only-child`. -->
+			<div class="serve">
+				{#if data.ruling.instructions}
+					<section class="rules">
+						<div class="down-tag"><Icon name="clipboard" size={13} /> The instructions</div>
+						<!-- Whitespace preserved, so a commissioner who types a numbered
+						     list gets a numbered list. It is still escaped text — nothing
+						     here builds markup out of data. -->
+						<p class="rules-body">{data.ruling.instructions}</p>
+					</section>
+				{/if}
+				<section class="risk">
+					<div class="down-tag red"><Icon name="flag" size={13} /> At Risk</div>
+					{#if data.riskState === 'listed'}
+						<p class="q-help risk-note">{lastPlaceNote(data.atRisk[0].name)}</p>
 						<ol class="risk-list">
 							{#each data.atRisk as team, i (team.rosterId)}
 								<li class="risk-row" class:risk-row--worst={i === 0}>
@@ -377,82 +409,80 @@
 								</li>
 							{/each}
 						</ol>
-					</section>
-				{/if}
-
-				{#if data.ruling.instructions}
-					<section class="rules">
-						<h3 class="rules-head">The instructions</h3>
-						<!-- Whitespace preserved, so a commissioner who types a numbered
-						     list gets a numbered list. It is still escaped text — nothing
-						     here builds markup out of data. -->
-						<p class="rules-body">{data.ruling.instructions}</p>
-					</section>
-				{/if}
-			{:else}
-				<p class="empty">{EMPTY.noPunishment}</p>
-			{/if}
+						<p class="risk-foot faint">
+							Bottom {data.atRisk.length} of {data.teamCount}, worst record first, points
+							breaking the tie. <a href="/b/standings">The whole table</a>.
+						</p>
+					{:else}
+						<!-- Two silences that mean opposite things, told apart on the
+						     server. See `riskState`. -->
+						<p class="empty risk-empty">
+							{data.riskState === 'preseason' ? EMPTY.noRiskYet : EMPTY.noRiskData}
+						</p>
+					{/if}
+				</section>
+			</div>
 		{/if}
 
 		{#if data.kind === 'rivalry'}
-			{#if data.pairings.length === 0}
-				<p class="empty">{EMPTY.noPairings}</p>
-			{/if}
+{#if data.pairings.length === 0}
+	<p class="empty">{EMPTY.noPairings}</p>
+{/if}
 
-			<div class="pairs">
-				{#each data.pairings as p, i (p.id)}
-					{@const card = rivalryCard(p)}
-					<article class="pair">
-						<!-- The two teams' colours, woven as houndstooth either side of a
-						     gap, on the page's own surface. Everything about how that is
-						     built lives in the component. -->
-						<RivalryHeader
-							colorA={colorsOf(p.a)}
-							colorB={colorsOf(p.b)}
-							name={card.name}
-							unnamedLabel={RIVALRY.unnamed}
-							teamA={card.aTeam}
-							teamB={card.bTeam}
-							heat={card.heat}
-							heatLabel={card.heat > 0 ? RIVALRY.heat(card.heat) : ''}
-							stagger={i}
-							badges={false}
-						/>
+<div class="pairs">
+	{#each data.pairings as p, i (p.id)}
+		{@const card = rivalryCard(p)}
+		<article class="pair">
+			<!-- The two teams' colours, woven as houndstooth either side of a
+			     gap, on the page's own surface. Everything about how that is
+			     built lives in the component. -->
+			<RivalryHeader
+				colorA={colorsOf(p.a)}
+				colorB={colorsOf(p.b)}
+				name={card.name}
+				unnamedLabel={RIVALRY.unnamed}
+				teamA={card.aTeam}
+				teamB={card.bTeam}
+				heat={card.heat}
+				heatLabel={card.heat > 0 ? RIVALRY.heat(card.heat) : ''}
+				stagger={i}
+				badges={false}
+			/>
 
-						{#if !card.empty}
-							<div
-								class="pair-body"
-								class:pair-body--solo={card.soloStake}
-								class:pair-body--wide={card.stakes.length === 0}
-							>
-								<!-- The bet is a bounded number, so it lives in a tile it
-								     cannot outgrow. The punishment is a sentence, so it takes
-								     the slack beside it. -->
-								{#each card.stakes as { f, st } (f.key)}
-									<div class="stake">
-										<span class="stake-amount nums">{st.value}</span>
-										<span class="stake-label">{f.short}</span>
-									</div>
-								{/each}
+			{#if !card.empty}
+				<div
+					class="pair-body"
+					class:pair-body--solo={card.soloStake}
+					class:pair-body--wide={card.stakes.length === 0}
+				>
+					<!-- The bet is a bounded number, so it lives in a tile it
+					     cannot outgrow. The punishment is a sentence, so it takes
+					     the slack beside it. -->
+					{#each card.stakes as { f, st } (f.key)}
+						<div class="stake">
+							<span class="stake-amount nums">{st.value}</span>
+							<span class="stake-label">{f.short}</span>
+						</div>
+					{/each}
 
-								{#if card.lines.length || card.pending.length}
-									<div class="forfeits">
-										{#each card.lines as { f, st } (f.key)}
-											<div class="settled">
-												<span class="settled-label">{f.short}</span>
-												<p class="line-value">{st.value}</p>
-											</div>
-										{/each}
+					{#if card.lines.length || card.pending.length}
+						<div class="forfeits">
+							{#each card.lines as { f, st } (f.key)}
+								<div class="settled">
+									<span class="settled-label">{f.short}</span>
+									<p class="line-value">{st.value}</p>
+								</div>
+							{/each}
 
-										<!-- Only the unsettled lines carry a label and a badge. -->
-										{#each card.pending as { f, st } (f.key)}
-											<div class="line">
-												<span class="down-tag">{f.short}</span>
-												{@render stateBadge(st)}
-											</div>
-										{/each}
-									</div>
-								{/if}
+							<!-- Only the unsettled lines carry a label and a badge. -->
+							{#each card.pending as { f, st } (f.key)}
+								<div class="line">
+									<span class="down-tag">{f.short}</span>
+									{@render stateBadge(st)}
+								</div>
+							{/each}
+						</div>
+					{/if}
 							</div>
 						{/if}
 
@@ -834,25 +864,22 @@
 	/* The draft board's clock, borrowed whole. It is the same object — a moment
 	   in the future the league is measured against — so it gets the same
 	   treatment rather than a second design that means the same thing. */
-	.clock--deadline {
-		margin-top: var(--s-4);
-	}
-
 	/* ── Most at risk ────────────────────────────────────────────────────────
 	   A short list, not the whole table — the Standings board is one tab away
 	   and this is only here to put a face on the sentence above it. The worst is
 	   marked once and in the danger colour, because that is the entire point of
 	   the section. */
+	/* Its own section now rather than a paragraph under the sentence, so it is
+	   separated the way the board separates anything else it wants read as a
+	   distinct fact: a rule, air, and a chip. The chip is `down-tag red` — the
+	   same red the verdict wears, because this is the same subject seen from
+	   the other end. */
 	.risk {
-		margin-top: var(--s-5);
+		margin: 0;
 	}
 
-	.risk-head {
-		font-family: var(--font-display);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		font-size: var(--t-md);
-		margin: 0 0 var(--s-1);
+	.risk-note {
+		margin: var(--s-2) 0 0;
 	}
 
 	.risk-list {
@@ -861,15 +888,27 @@
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-2);
+		gap: var(--s-1);
+	}
+
+	/* Says what the list IS. "Bottom 3" without a denominator reads as a
+	   verdict; with one it reads as a standing. */
+	.risk-foot {
+		margin: var(--s-3) 0 0;
+	}
+
+	.risk-empty {
+		margin-top: var(--s-3);
+		padding: var(--s-4);
+		text-align: left;
 	}
 
 	.risk-row {
 		display: flex;
-		align-items: center;
+		align-items: baseline;
 		gap: var(--s-3);
 		padding: var(--s-2) var(--s-3);
-		border-radius: var(--r-md);
+		border-radius: var(--r-sm);
 		border: 1px solid var(--border);
 		background: var(--surface-2);
 	}
@@ -907,7 +946,7 @@
 	}
 
 	.risk-record .faint {
-		display: block;
+		margin-left: var(--s-2);
 		font-size: var(--t-xs);
 	}
 
@@ -915,18 +954,37 @@
 	   Who and by when, as a definition list, because that is what they are. Side
 	   by side on anything wider than a phone so the deadline is never below the
 	   fold of the fact it qualifies. */
+	/* The terms of the ruling, the countdown among them. `auto-fit` rather than
+	   a fixed pair, because how many there are depends on the ruling: a victim
+	   may be unset, and "Done by" only appears when there is no countdown to
+	   state it. 15rem is wide enough that the dials never share a column with
+	   prose. */
 	.terms {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-		gap: var(--s-3);
-		margin: var(--s-4) 0 0;
+		grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+		gap: var(--s-3) var(--s-5);
+		margin: var(--s-5) 0 0;
 	}
 
+	/* Set on the verdict's own ground rather than in boxes of their own — a
+	   card inside a card is two borders saying the same thing. A rule over each
+	   term separates it from the sentence above without spending a band on it. */
+	/* Label over value rather than beside it. Inline, "WHO DOES IT  Last place,
+	   toilet bowl" was one small line at the top of a half-width column with
+	   50-odd px of empty red under it, while the countdown beside it filled its
+	   own column twice over. Stacked — and with the value set large enough to
+	   be a headline in its own right — the two halves carry comparable weight
+	   and the section reads as one block rather than a fact and an afterthought.
+
+	   It is also the shape the countdown needed anyway: a 12px label cannot sit
+	   on a baseline with 34px digits. One rule for both instead of a modifier
+	   undoing the default. */
 	.term {
-		padding: var(--s-3) var(--s-4);
-		border-radius: var(--r-md);
-		border: 1px solid var(--border);
-		background: var(--surface-2);
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-1);
+		padding: var(--s-3) 0 0;
+		border-top: 1px solid var(--danger-line);
 	}
 
 	.term dt {
@@ -935,27 +993,119 @@
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
 		color: var(--ink-soft);
-		margin-bottom: var(--s-1);
 	}
 
 	.term dd {
 		margin: 0;
+		min-width: 0;
 		font-family: var(--font-display);
-		font-size: var(--t-md);
-		line-height: 1.25;
+		font-size: clamp(18px, 1.9vw, 26px);
+		line-height: 1.15;
 		overflow-wrap: anywhere;
 	}
 
-	.rules {
-		margin-top: var(--s-5);
+	.term--count dd {
+		font-family: inherit;
 	}
 
-	.rules-head {
-		font-family: var(--font-display);
-		text-transform: uppercase;
+	.term--up dt {
+		color: var(--danger);
+	}
+
+	/* Under the dials: the exact moment, and what "by then" means. One line, and
+	   the qualifier is quieter than the date because the date is the fact. */
+	.count-when {
+		display: block;
+		margin-top: var(--s-1);
+		font-family: var(--font-mono);
+		font-size: var(--t-xs);
+		font-weight: 700;
 		letter-spacing: 0.04em;
-		font-size: var(--t-md);
-		margin: 0 0 var(--s-2);
+		text-transform: uppercase;
+		color: var(--ink-soft);
+	}
+
+	.count-live {
+		font-size: clamp(26px, 3.4vw, 34px);
+		line-height: 1;
+		color: var(--danger);
+	}
+
+	/* The dials were built for the draft board's dark turf panel: centred,
+	   chalk-white, gold labels. Here they are type in the ruling, so they take
+	   the ruling's colour and its left edge — the punishment, the terms and the
+	   numerals all start on the same line down the card. */
+	.term--count .dials {
+		justify-content: flex-start;
+		/* Wide enough that "176 07 08 09" reads as four numbers rather than one
+		   long one, and still able to close up on a phone. */
+		gap: clamp(var(--s-3), 2vw, var(--s-5));
+		margin: 0;
+	}
+
+	.term--count .dial {
+		gap: 2px;
+	}
+
+	.term--count .dial b {
+		/* Just under the headline, so the two read as a pair rather than one
+		   shouting over the other. 22px floor keeps four columns on a phone. */
+		font-size: clamp(22px, 3.4vw, 34px);
+		color: var(--danger);
+	}
+
+	.term--count .dial i {
+		font-size: 9px;
+		color: var(--ink-soft);
+	}
+
+	/* The follow-through: how it is served, and who is on the hook to serve it.
+	   Two things that were each a full-width band for content that never came
+	   close to filling one — the instructions run past a readable measure long
+	   before they run out of room, and At Risk is three names.
+
+	   `minmax(0, ...)` on both tracks, or the pre-wrapped instructions set their
+	   column's min-content width to their longest line and shove At Risk off
+	   the card. Stretch, so the pair bottoms out level.
+
+	   Separated from the ruling above by one rule across the full width rather
+	   than a border on each panel. */
+	.serve {
+		display: grid;
+		grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+		gap: var(--s-4);
+		align-items: stretch;
+		margin-top: var(--s-5);
+		padding-top: var(--s-4);
+		border-top: 1px solid var(--border);
+	}
+
+	/* Before there is a ruling, and on a board with no instructions, At Risk is
+	   the only thing in the band — and half a band of nothing is exactly the
+	   problem this layout exists to fix. */
+	.serve > :only-child {
+		grid-column: 1 / -1;
+	}
+
+	/* One column before there is room for two. 820px is where the instructions
+	   drop under ~40 characters a line, which is where a numbered list starts
+	   wrapping every item. */
+	@media (max-width: 820px) {
+		.serve {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+
+	.rules {
+		display: flex;
+		flex-direction: column;
+		margin: 0;
+	}
+
+	/* Takes the slack, rather than the section growing and leaving the box
+	   floating at the top of it. */
+	.rules-body {
+		flex: 1;
 	}
 
 	/* `pre-wrap`, so a list typed as a list survives the trip to the board. */
@@ -970,35 +1120,49 @@
 		overflow-wrap: anywhere;
 	}
 
+	/* A column with the terms pushed to the bottom. Stretched to the clock's
+	   height beside it, a two-line ruling left ~85px of empty red under itself;
+	   spread top-and-bottom the same box reads as deliberate. The stamp is out
+	   of flow, so it is not part of the spread. */
 	.verdict {
 		position: relative;
 		overflow: hidden;
 		padding: var(--s-5);
-		padding-right: 120px;
-		margin-bottom: var(--s-5);
+		margin: 0;
 		border-radius: var(--r-md);
 		border: 2px solid var(--danger);
 		background: var(--danger-soft);
 	}
 
+	/* The reserve moved off the box and onto the line. It was on the box
+	   because the box was one line; with the terms inside, keeping 120px clear
+	   the whole way down cut a column off the pair for a stamp that is nowhere
+	   near them. */
 	.verdict-text {
-		font-size: var(--t-lg);
+		padding-right: 116px;
+		font-size: clamp(26px, 3.6vw, 44px);
+		line-height: 1.05;
 		color: var(--danger);
-		margin-bottom: var(--s-2);
+		margin-bottom: 0;
 		text-wrap: balance;
+		/* At 44px one long word is wider than a phone. `.verdict` clips its
+		   overflow, so without this a punishment nobody spaced out would be
+		   silently cut off rather than wrapped. */
+		overflow-wrap: anywhere;
 	}
 
+	/* Pinned to the top rather than centred, so it stays beside the sentence it
+	   stamps instead of drifting down beside the terms as the block grows. */
 	.verdict .stamp {
 		position: absolute;
-		top: 50%;
+		top: var(--s-4);
 		right: var(--s-3);
-		margin-top: -22px;
 		opacity: 0.55;
 	}
 
 	@media (max-width: 560px) {
-		.verdict {
-			padding-right: var(--s-5);
+		.verdict-text {
+			padding-right: 0;
 		}
 
 		.verdict .stamp {
