@@ -769,13 +769,32 @@ describe('[14] The Pot is set from the Desk, not counted from a survey', () => {
 		const res = await api('/api/desk/pot', {
 			buyIn: 50,
 			split: [
-				{ label: '1st place', pct: 60 },
-				{ label: '2nd place', pct: 30 }
+				{ bracket: 'final', place: 1, pct: 60 },
+				{ bracket: 'final', place: 2, pct: 30 }
 			]
 		}, { cookie });
 		expect(res.status).toBe(422);
 		expect(JSON.stringify(res.body)).toMatch(/totals 90%/);
 	});
+
+	// A slice is a placement, not a sentence. The label the board prints is
+	// derived from it, so there is nothing left to misspell.
+	it('refuses a slice that does not name a real placement', () => api('/api/desk/pot', {
+		buyIn: 50,
+		split: [{ label: 'Toilet bowl champion', pct: 100 }]
+	}, { cookie }).then((res) => {
+		expect(res.status).toBe(422);
+	}));
+
+	it('refuses to pay the same placement twice', () => api('/api/desk/pot', {
+		buyIn: 50,
+		split: [
+			{ bracket: 'final', place: 1, pct: 50 },
+			{ bracket: 'final', place: 1, pct: 50 }
+		]
+	}, { cookie }).then((res) => {
+		expect(res.status).toBe(422);
+	}));
 
 	it('refuses a stranger', async () => {
 		const res = await api('/api/desk/pot', { buyIn: 50, split: [] });
@@ -786,9 +805,10 @@ describe('[14] The Pot is set from the Desk, not counted from a survey', () => {
 		const res = await api('/api/desk/pot', {
 			buyIn: 50,
 			split: [
-				{ label: '1st place', pct: 60 },
-				{ label: '2nd place', pct: 30 },
-				{ label: '3rd place', pct: 10 }
+				{ bracket: 'final', place: 1, pct: 55 },
+				{ bracket: 'final', place: 2, pct: 30 },
+				{ bracket: 'final', place: 3, pct: 10 },
+				{ bracket: 'regular', place: 1, pct: 5 }
 			]
 		}, { cookie });
 		expect(res.status).toBe(200);
@@ -797,9 +817,11 @@ describe('[14] The Pot is set from the Desk, not counted from a survey', () => {
 		// $50 x 14 players.
 		expect(html).toContain('$700');
 		expect(html).toContain('buy-in');
+		// Labels the board derived from the placements, never stored.
 		expect(html).toContain('1st place');
-		// 60% of $700, in real dollars rather than a percentage.
-		expect(html).toContain('$420');
+		expect(html).toContain('1st place, regular season');
+		// 55% of $700, in real dollars rather than a percentage.
+		expect(html).toContain('$385');
 	});
 
 	it('still publishes no survey answers once it has real numbers', async () => {
