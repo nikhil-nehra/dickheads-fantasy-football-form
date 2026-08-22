@@ -458,9 +458,26 @@ export async function saveNegotiation(
 	},
 	opts: { bypassStatus?: boolean } = {}
 ): Promise<SaveOutcome> {
+	/* The bypass branch drops `?6` out of the statement, so the binding list has
+	   to drop `surveyId` with it — D1 rejects a statement bound with more
+	   parameters than it references, and the whole call 500s.
+
+	   That made this function unusable by the one person most likely to call
+	   it: `bypassStatus` is set for the commissioner, so the commissioner could
+	   not write a single line of their own rivalry while signed in to the Desk.
+	   Nothing caught it because every other caller is signed out. */
 	const gate = opts.bypassStatus
 		? '1 = 1'
 		: `EXISTS (SELECT 1 FROM survey s WHERE s.id = ?6 AND s.status IN ('open'))`;
+
+	const args: (string | null)[] = [
+		entry.pairingId,
+		entry.fieldKey,
+		entry.playerId,
+		entry.proposal,
+		entry.pick
+	];
+	if (!opts.bypassStatus) args.push(surveyId);
 
 	const res = await db
 		.prepare(
@@ -474,14 +491,7 @@ export async function saveNegotiation(
 			               pick     = excluded.pick,
 			               updated_at = datetime('now')`
 		)
-		.bind(
-			entry.pairingId,
-			entry.fieldKey,
-			entry.playerId,
-			entry.proposal,
-			entry.pick,
-			surveyId
-		)
+		.bind(...args)
 		.run();
 
 	if (res.meta.changes > 0) return 'saved';

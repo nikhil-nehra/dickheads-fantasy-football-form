@@ -238,6 +238,7 @@ describe('[8] authorization', () => {
 
 describe('[9] rivalry negotiation', () => {
 	let pairingId: string;
+	let otherPairingId: string;
 
 	beforeAll(async () => {
 		await setStatus(cookie, 'rivalry', 'open');
@@ -258,6 +259,59 @@ describe('[9] rivalry negotiation', () => {
 		// option ids are UUIDs too, so a regex over the HTML picks the wrong one.
 		const pairings = res.body.pairings as { id: string; a: string; b: string }[];
 		pairingId = pairings.find((p) => p.a === 'nikhil-nehra' || p.b === 'nikhil-nehra')!.id;
+		otherPairingId = pairings.find((p) => p.a === 'ryan-latin' || p.b === 'ryan-latin')!.id;
+	});
+
+	it('lets the commissioner write their own side while signed in to the Desk', async () => {
+		/* A commissioner's write takes the `bypassStatus` branch, which drops a
+		   parameter out of the statement — and the binding list has to drop it
+		   too, or D1 rejects the call outright and every line of the
+		   commissioner's own rivalry 500s. Nothing else covers this: every other
+		   test here is signed out, which is exactly how it survived.
+
+		   On the other pairing, so it cannot disturb the assertions below. */
+		const res = await api(
+			'/api/surveys/rivalry/negotiation',
+			{
+				pairingId: otherPairingId,
+				playerId: 'ryan-latin',
+				fieldKey: 'rname',
+				proposal: 'The Commissioner Was Here',
+				pick: 'The Commissioner Was Here'
+			},
+			{ cookie }
+		);
+		expect(res.status).toBe(200);
+		expect(await page('/b/rivalry')).toContain('The Commissioner Was Here');
+	});
+
+	it('still refuses a signed-out write once the survey is closed', async () => {
+		// The bypass must not have widened the gate it bypasses.
+		await setStatus(cookie, 'rivalry', 'closed');
+		const shut = await api('/api/surveys/rivalry/negotiation', {
+			pairingId: otherPairingId,
+			playerId: 'rayyan-ali',
+			fieldKey: 'rname',
+			proposal: 'Not on my watch',
+			pick: 'Not on my watch'
+		});
+		expect(shut.status).toBe(409);
+
+		// ...while the commissioner still gets through, which is the point of it.
+		const open = await api(
+			'/api/surveys/rivalry/negotiation',
+			{
+				pairingId: otherPairingId,
+				playerId: 'ryan-latin',
+				fieldKey: 'rname',
+				proposal: 'The Commissioner Was Here',
+				pick: 'The Commissioner Was Here'
+			},
+			{ cookie }
+		);
+		expect(open.status).toBe(200);
+
+		await setStatus(cookie, 'rivalry', 'open');
 	});
 
 	it('refuses a ruling on a pairing that does not exist', async () => {
@@ -381,6 +435,52 @@ describe('[9] rivalry negotiation', () => {
 		expect(JSON.stringify(res.body)).toMatch(/dollar amount/);
 	});
 
+	it('stores a team colour normalised, and never as a body row', async () => {
+		const res = await api('/api/surveys/rivalry/negotiation', {
+			pairingId,
+			playerId: 'nikhil-nehra',
+			fieldKey: 'colorPrimary',
+			pick: '  #B91932  '
+		});
+		expect(res.status).toBe(200);
+
+		const html = await page('/b/rivalry');
+		// Colours are the header's texture, so they reach the page as ink in a
+		// pattern — never as a "Primary color" line in the card body.
+		expect(html).not.toContain('Primary color');
+		expect(html).toContain('rh__ink');
+	});
+
+	it('does not settle a colour line when both teams pick the same one', async () => {
+		/* The one line where matching is the WRONG outcome. Both sides write the
+		   same red; neither of them has agreed anything, because there was never
+		   anything to agree — each still holds their own answer. */
+		const res = await api('/api/surveys/rivalry/negotiation', {
+			pairingId,
+			playerId: 'sean-vargeese',
+			fieldKey: 'colorPrimary',
+			pick: '#b91932'
+		});
+		expect(res.status).toBe(200);
+
+		const html = await page('/b/rivalry');
+		expect(html).not.toContain('Primary color');
+		// No badge, no "Agreed", no place in the settled count — an own line is
+		// filtered out of the board's field list entirely.
+		expect(html).not.toContain('#b91932</');
+	});
+
+	it('refuses anything that is not a colour on a colour line', async () => {
+		const res = await api('/api/surveys/rivalry/negotiation', {
+			pairingId,
+			playerId: 'nikhil-nehra',
+			fieldKey: 'colorPrimary',
+			pick: 'a sort of maroon'
+		});
+		expect(res.status).toBe(422);
+		expect(JSON.stringify(res.body)).toMatch(/has to be a colour/);
+	});
+
 	it('refuses a write from someone outside the pairing', async () => {
 		const res = await api('/api/surveys/rivalry/negotiation', {
 			pairingId,
@@ -467,11 +567,22 @@ describe('[10] linking players to Sleeper accounts', () => {
 });
 
 describe('[11] the ballot pool', () => {
-	it('carries free-text answers across from another survey', async () => {
-		// Opening rivalry syncs the pool from intake's punishment answers.
+	it('materialises the commissioner shortlist when the survey opens', async () => {
+		// Opening a survey is the moment its ballot pool is built. The shortlist
+		// is the intake's punishment ideas, edited by hand into one option per
+		// idea — see the note in src/lib/surveys/rivalry.ts.
 		await setStatus(cookie, 'rivalry', 'open');
 		const html = await page('/s/rivalry?as=nikhil-nehra');
-		expect(html).toContain('Second thoughts, actually');
+		expect(html).toContain('Run the Milk Mile');
+	});
+
+	it('does NOT re-import the raw answers those options were edited from', async () => {
+		/* `importFrom` is off for this question on purpose. Left on, every raw
+		   intake string would land on the ballot beside its own cleaned-up
+		   version and split the vote with it — and the ranked ballot's whole job
+		   is to not do that. */
+		const html = await page('/s/rivalry?as=nikhil-nehra');
+		expect(html).not.toContain('Second thoughts, actually');
 	});
 
 	it('de-duplicates a write-in that already exists', async () => {
@@ -766,7 +877,10 @@ describe('[16] a bet and a forfeit are optional', () => {
 		// that would read as a card which failed to load. Just the name, the
 		// teams and the two of them.
 		expect(html).not.toContain('Pride only');
-		expect(html).not.toMatch(/No (bet|side punishment)\./);
+		// The survey's own copy for a settled-at-nothing line. It belongs there,
+		// where the two of them are still deciding — never on the board.
+		expect(html).not.toContain('No bet. Just pride.');
+		expect(html).not.toContain('No forfeit. The bet is the whole bet.');
 	});
 
 	it('lets the one line they did agree stand on its own', async () => {

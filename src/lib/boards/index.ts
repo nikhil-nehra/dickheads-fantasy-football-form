@@ -28,10 +28,10 @@ export const BOARDS: BoardDefinition[] = [
 		title: 'The Rivalry Board',
 		from: 'rivalry',
 		blurb:
-			'Every agreed rivalry name, bet and side punishment. This is the one to paste in Sleeper.',
+			'Every agreed rivalry name, bet and side forfeit. This is the one to paste in Sleeper.',
 		og: {
 			title: 'The Rivalry Board',
-			description: 'Every rivalry name, bet and side punishment — settled, ruled or still in dispute.'
+			description: 'Every rivalry name, bet and side forfeit — settled, ruled or still in dispute.'
 		}
 	},
 	{

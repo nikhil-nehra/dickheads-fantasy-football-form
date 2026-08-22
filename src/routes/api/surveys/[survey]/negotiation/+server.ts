@@ -4,6 +4,7 @@ import { surveyById } from '$lib/surveys';
 import { allQuestions } from '$lib/surveys/types';
 import { saveNegotiation, rateLimited } from '$lib/server/db';
 import { normaliseMoney } from '$lib/money';
+import { normaliseHex } from '$lib/color';
 import { NONE, isNone } from '$lib/negotiation';
 
 const MAX_FIELD = 500;
@@ -44,10 +45,17 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 	/* A money line is normalised to one canonical string before it is stored.
 	   Agreement on a line is derived by comparing the two sides' answers, so
 	   without this one player typing "20" and the other "$20" would disagree
-	   forever about a number they had both already agreed on. */
+	   forever about a number they had both already agreed on.
+
+	   A colour is normalised for the same reason one step removed: nothing
+	   compares the two SIDES of a colour line, but the swatch grid compares the
+	   stored value against each swatch to show you which one you picked, and
+	   the header asks whether the two teams landed on the same colour. Store
+	   "#B3122F" and both of those quietly answer no. */
 	const clean = (v: string | null | undefined) => {
 		const t = trim(v);
 		if (t === null) return t;
+		if (field.kind === 'color') return normaliseHex(t);
 		// "There isn't one" is a settled answer on any line, including a money
 		// line, so it is canonicalised rather than validated as an amount.
 		if (isNone(t)) return NONE;
@@ -62,7 +70,25 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 				return json(
 					{
 						error: 'not_money',
-						message: `${field.short} is a dollar amount. Put anything the loser has to DO in the side punishment.`
+						message: `${field.short} is a dollar amount. Put anything the loser has to DO in the side forfeit.`
+					},
+					{ status: 422 }
+				);
+			}
+		}
+	}
+
+	/* A colour line has no "there isn't one": every team has colours, the board
+	   draws with them either way, and NONE would be stored as the literal string
+	   "None" and then fail to parse as a colour every time it was read. */
+	if (field.kind === 'color') {
+		for (const v of [body.proposal, body.pick]) {
+			const t = trim(v);
+			if (t !== null && normaliseHex(t) === null) {
+				return json(
+					{
+						error: 'not_color',
+						message: `${field.short} has to be a colour — pick a swatch, or type a hex like #b91932.`
 					},
 					{ status: 422 }
 				);

@@ -101,9 +101,10 @@ export type VictimResolution = { targetId: string; label: string; who: string | 
 /**
  * Resolve who actually serves the punishment.
  *
- * These were all human judgement calls before, argued about in January. Three
- * of the four are now straight reads off the standings, and the fourth
- * (toilet bowl) off the losers bracket.
+ * These were human judgement calls before, argued about in January. Both of
+ * the options the survey now offers are straight reads: last place off the
+ * standings, the toilet bowl off the losers bracket. A write-in is neither,
+ * and is handed back unresolved rather than approximated.
  */
 export function resolveVictim(
 	targetId: string,
@@ -127,15 +128,6 @@ export function resolveVictim(
 			};
 		}
 
-		case 'fewest-pts': {
-			const fewest = by(standings ?? [], (a, b) => a.pointsFor - b.pointsFor);
-			return {
-				targetId,
-				label: 'Fewest total points scored',
-				who: fewest ? fewest.displayName : null
-			};
-		}
-
 		case 'toilet': {
 			// The final game of the consolation bracket; its loser takes it.
 			const rounds = losersBracket ?? [];
@@ -143,13 +135,16 @@ export function resolveVictim(
 			const final = rounds.find((m) => (m.r ?? 0) === finalRound && m.l != null);
 			return {
 				targetId,
-				label: 'Loser of the consolation bracket',
+				label: 'Last place — toilet bowl',
 				who: final?.l != null ? rosterName(final.l) : null
 			};
 		}
 
 		default:
-			// 'final-last', 'both' and any write-in stay a human call.
+			/* A write-in stays a human call, and so does any id from a ballot
+			   that has since changed shape. Both are the same case: an id this
+			   function cannot resolve is reported as itself with no victim
+			   attached, never guessed at. */
 			return { targetId, label: targetId, who: null };
 	}
 }

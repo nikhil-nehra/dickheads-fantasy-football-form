@@ -181,13 +181,31 @@ describe('intake validation', () => {
 
 describe('rivalry validation', () => {
 	const goodRivalry = (over: Record<string, unknown> = {}) => ({
-		podium: ['opt-b', 'opt-a'],
+		podium: ['opt-b', 'opt-a', 'opt-c'],
 		target: { choice: 'reg-last' },
 		...over
 	});
 
 	it('accepts a valid ballot and victim vote', () => {
 		expect(validateResponse(rivalry, goodRivalry(), ctx).ok).toBe(true);
+	});
+
+	it('rejects a podium with slots left empty', () => {
+		// "Rank your top 3" on a 3/2/1 scale is not "rank up to 3": a short
+		// podium is a quieter vote, and the person casting it cannot tell.
+		const res = validateResponse(rivalry, goodRivalry({ podium: ['opt-b', 'opt-a'] }), ctx);
+		expect(res.ok).toBe(false);
+		expect(errorFor(res, 'podium')).toMatch(/all 3/i);
+	});
+
+	it('caps the required podium at the size of the pool', () => {
+		// A ballot holding two options cannot be ranked three deep, and a survey
+		// nobody can submit is worse than a podium with a gap in it.
+		const thin: ValidationContext = { ...ctx, ballotOptions: { podium: ['opt-a', 'opt-b'] } };
+		expect(validateResponse(rivalry, goodRivalry({ podium: ['opt-a', 'opt-b'] }), thin).ok).toBe(
+			true
+		);
+		expect(validateResponse(rivalry, goodRivalry({ podium: ['opt-a'] }), thin).ok).toBe(false);
 	});
 
 	it('rejects a podium longer than the podium size', () => {

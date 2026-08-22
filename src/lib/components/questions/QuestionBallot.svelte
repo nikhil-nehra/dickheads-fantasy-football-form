@@ -57,7 +57,7 @@
 			if (id && !full && !podium.includes(id)) value = [...podium, id];
 			writeIn = '';
 		} catch {
-			writeInError = "Couldn't add that one — try again.";
+			writeInError = "Couldn't add that one. Try again.";
 		} finally {
 			saving = false;
 		}
@@ -114,7 +114,7 @@
 		</li>
 	{:else if pool.length === 0}
 		<li class="muted">
-			That's the whole ballot so far — you've ranked all of it. Write another one in below.
+			That's the whole ballot so far. Write another one in below.
 		</li>
 	{/if}
 </ul>

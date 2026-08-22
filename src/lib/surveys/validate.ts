@@ -163,10 +163,21 @@ export function schemaFor(q: Question, ctx: ValidationContext): z.ZodType {
 
 		case 'ballot': {
 			const valid = ctx.ballotOptions[q.id] ?? [];
+			/* Capped by the pool. "Rank all 3" is an impossible instruction on a
+			   ballot holding two options, and a survey that cannot be submitted is
+			   worse than a podium with a gap in it. */
+			const need = Math.min(q.minPicks ?? 0, valid.length);
 			return z
 				.array(z.string().refine((id) => valid.includes(id), 'Unknown ballot option.'))
 				.max(q.podiumSize, `Rank at most ${q.podiumSize}.`)
-				.refine((v) => new Set(v).size === v.length, 'No duplicates on the podium.');
+				/* Ahead of the length check on purpose: only the first issue is
+				   reported, and a podium of the same option twice is short BECAUSE
+				   it is duplicated. "No duplicates" is the thing that happened. */
+				.refine((v) => new Set(v).size === v.length, 'No duplicates on the podium.')
+				.refine((v) => v.length >= need, {
+					message:
+						need === 1 ? 'Pick one.' : `Fill all ${need} slots.`
+				});
 		}
 
 		case 'negotiation':

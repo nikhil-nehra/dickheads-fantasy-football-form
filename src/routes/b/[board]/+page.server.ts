@@ -161,8 +161,19 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 			   `nameKey` is sent instead so the header stays data-driven rather
 			   than hardcoding this survey's key. */
 			nameKey: negFields.find((f) => f.kind === 'name')?.key ?? null,
+			/* Same reasoning as `nameKey`, for the same reason: the colours are
+			   the header's texture, not a row in the card body, so they are sent
+			   as keys rather than as fields. In document order — the first colour
+			   line a survey declares is the primary, the second the secondary,
+			   which is how the definition reads top to bottom and how the pattern
+			   spends them (checker, then teeth). */
+			colorKeys: negFields.filter((f) => f.kind === 'color').map((f) => f.key),
+			/* An 'own' line has no agreement to report, so it has no badge, no
+			   "in dispute" and no place in the settled count that drives the
+			   heat. Dropping it here keeps every one of those out of the payload
+			   rather than teaching the card to skip it in four places. */
 			fields: negFields
-				.filter((f) => f.kind !== 'name')
+				.filter((f) => f.kind !== 'name' && f.mode !== 'own')
 				.map((f) => ({ key: f.key, short: f.short, kind: f.kind ?? 'text' })),
 			pairings: pairings.map((p) => ({
 				id: p.id,

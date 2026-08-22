@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { BOARDS } from '$lib/boards';
-	import { fieldStatus, heatFrom, isNone, type FieldState } from '$lib/negotiation';
+	import { fieldStatus, heatFrom, isNone, ownValue, type Entry, type FieldState } from '$lib/negotiation';
 	import { countdown } from '$lib/draft';
 	import { isMoney } from '$lib/money';
 	import { countUp } from '$lib/motion';
@@ -11,21 +11,33 @@
 	import type { TeamColors } from '$lib/rivalryPattern';
 
 	/* ── Team colours ────────────────────────────────────────────────────────
-	   Nobody has picked any yet — the survey question does not exist. Until it
-	   does, every team is grey, which is the honest way to say "not chosen"
-	   rather than inventing a colour and having it change under people later.
+	   Both picked in the rivalry survey, on a line with no second side to
+	   satisfy: your colours are yours, and matching your rival is the one
+	   outcome the header cannot draw.
 
-	   Grey costs the board something worth naming: with no colour to tell them
-	   apart, every header is identical, which is exactly the wall-of-sameness
-	   the old arenas existed to break up. It is a placeholder, and it should
-	   stop being one.
+	   Grey is what a team who has not picked gets. It is the honest way to say
+	   "not chosen" rather than inventing a colour and having it change under
+	   people later, and it costs the board exactly what it should: with no
+	   colour to tell two halves apart, the header falls back to scale and
+	   mirrored teeth, which is a duller card than the one they would have had.
 
-	   The generator does the rest on its own: two greys read as a collision, so
-	   side b already gets the coarser tile, and that scale difference plus the
-	   mirrored teeth are what separate the halves in the meantime. */
+	   Nothing here validates a hex. `parseHex` returns null on anything it
+	   cannot read and the generator substitutes its own fallback, so a colour
+	   typed by a person is incapable of breaking this page. */
 	const UNPICKED: TeamColors = { primary: '#8a8a8a', secondary: '#8a8a8a' };
 
 	let { data } = $props();
+
+	/* One side's pair of picks. `data.colorKeys` is in the order the survey
+	   declares them — primary first — so this board never names a field key. */
+	function colorsOf(entries: Entry[]): TeamColors {
+		if (data.kind !== 'rivalry') return UNPICKED;
+		const [primaryKey, secondaryKey] = data.colorKeys;
+		return {
+			primary: (primaryKey && ownValue(primaryKey, entries)) || UNPICKED.primary,
+			secondary: (secondaryKey && ownValue(secondaryKey, entries)) || UNPICKED.secondary
+		};
+	}
 
 	/* ── Live headline numbers, which also drive the link preview ─────────── */
 
@@ -306,8 +318,8 @@
 						     gap, on the page's own surface. Everything about how that is
 						     built lives in the component. -->
 						<RivalryHeader
-							colorA={UNPICKED}
-							colorB={UNPICKED}
+							colorA={colorsOf(p.a)}
+							colorB={colorsOf(p.b)}
 							name={card.name}
 							unnamedLabel={RIVALRY.unnamed}
 							teamA={card.aTeam}

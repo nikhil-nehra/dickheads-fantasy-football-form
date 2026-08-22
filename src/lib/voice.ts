@@ -260,13 +260,27 @@ export const RIVALRY = {
 	/** Where the agreed name goes, before there is one. */
 	unnamed: 'Still unnamed',
 
+	/**
+	 * The last word under the negotiation block.
+	 *
+	 * The mechanic is deliberately one that CANNOT be finished alone — a line
+	 * settles only when both sides land on the same answer — so the form has to
+	 * say what happens when nobody blinks, and point at the thing that actually
+	 * unblocks it. Which is a text message, not another visit to this page.
+	 */
+	deadline: 'Not settled by draft day and the commissioner picks. Text each other.',
+
+	/** Both teams picked a colour that will not survive the header's 8% wash. */
+	clash: (short: string, rival: string) =>
+		`Too close to ${rival}'s ${short.toLowerCase()}. Your half of the board will look like theirs.`,
+
 
 	/**
 	 * What the flames mean, for a tooltip and for a screen reader — the icons
 	 * are decoration, this is the sentence that carries the information.
 	 */
 	heat(n: number): string {
-		if (n >= 3) return 'Fully settled — name, bet and side punishment all agreed. This one is on.';
+		if (n >= 3) return 'Fully settled — name, bet and side forfeit all agreed. This one is on.';
 		if (n === 2) return 'Two of three lines agreed. Nearly on.';
 		return 'One line agreed. Barely warm.';
 	}

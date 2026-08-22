@@ -119,6 +119,16 @@ export type AllocationQuestion = Base & {
 export type BallotQuestion = Base & {
 	type: 'ballot';
 	podiumSize: number;
+	/**
+	 * How many slots have to be filled for the ballot to count, capped by the
+	 * size of the pool.
+	 *
+	 * "Rank your top 3" on a 3/2/1 scale is not the same offer as "rank up to
+	 * 3": a half-filled podium is a quieter vote than a full one, and the
+	 * person casting it has no way to tell. Omit it and any non-empty podium
+	 * passes, which is the right behaviour for a ballot with no scoring.
+	 */
+	minPicks?: number;
 	/** Points awarded to 1st, 2nd, 3rd… */
 	points: number[];
 	writeIn?: { label: string; placeholder?: string; maxLength?: number };
@@ -135,28 +145,86 @@ export type BallotQuestion = Base & {
  */
 export type NegotiationQuestion = Base & {
 	type: 'negotiation';
-	fields: {
-		key: string;
-		tag: string;
-		short: string;
-		prompt: string;
-		help: string;
-		placeholder: string;
-		/**
-		 * What this line actually holds, which decides how it is captured and
-		 * how the board prints it.
-		 *
-		 *   'name'  — the rivalry's name. The board puts it on the title card, so
-		 *             it is deliberately NOT repeated in the card body.
-		 *   'money' — a dollar amount and nothing else. Captured with a number
-		 *             input and normalised on write, so "20" and "$20" are the
-		 *             same answer rather than a permanent disagreement.
-		 *   'text'  — prose. Gets the room prose needs.
-		 *
-		 * Defaults to 'text' when omitted.
-		 */
-		kind?: 'name' | 'money' | 'text';
-	}[];
+	fields: NegotiationField[];
+};
+
+export type NegotiationField = {
+	key: string;
+	tag: string;
+	short: string;
+	prompt: string;
+	help: string;
+	placeholder: string;
+	/**
+	 * What this line actually holds, which decides how it is captured and
+	 * how the board prints it.
+	 *
+	 *   'name'  — the rivalry's name. The board puts it on the title card, so
+	 *             it is deliberately NOT repeated in the card body.
+	 *   'money' — a dollar amount and nothing else. Captured with a number
+	 *             input and normalised on write, so "20" and "$20" are the
+	 *             same answer rather than a permanent disagreement.
+	 *   'color' — one hex colour, normalised on write. Always `mode: 'own'`;
+	 *             see below for why.
+	 *   'text'  — prose. Gets the room prose needs.
+	 *
+	 * Defaults to 'text' when omitted.
+	 */
+	kind?: 'name' | 'money' | 'text' | 'color';
+	/**
+	 * Who the answer belongs to.
+	 *
+	 *   'agree' — the default, and the mechanic the whole table was built for:
+	 *             both sides propose, both sides pick, and the line settles
+	 *             when the two picks match. A name, a bet and a forfeit are all
+	 *             joint facts, so there is exactly one of each per rivalry.
+	 *
+	 *   'own'   — each side answers for itself and there is nothing to settle.
+	 *             Team colours are the case: your colours are yours, your
+	 *             rival's are theirs, and the header wants both. Agreement here
+	 *             would be the WRONG outcome — two teams in the same red is the
+	 *             one result the pattern cannot draw.
+	 *
+	 * An 'own' line still lives in `negotiation_entry`, which buys the thing
+	 * that made this worth doing at all: your rival's answer is already loaded
+	 * beside yours, so you can see their colours before you pick against them.
+	 * The cost is that the value is keyed by pairing rather than by player, and
+	 * a re-pair would leave it behind — acceptable while a season's pairings
+	 * are set once and a UNIQUE constraint keeps anybody from being in two.
+	 */
+	mode?: 'agree' | 'own';
+	/**
+	 * Adds a way to say the line has no answer, under the box rather than in
+	 * front of it.
+	 *
+	 * A bet and a side forfeit are both things a pair may simply not want, and
+	 * "we discussed it and there's no bet" has to be sayable — otherwise it is
+	 * indistinguishable from "neither of us got round to it", which is what the
+	 * board would print. Declining is an ANSWER: it is written like every other
+	 * value, compared against the other side's like every other value, and the
+	 * line settles only when both of them decline.
+	 *
+	 * It sits at the BOTTOM of the card on purpose. Asked first, it is a gate
+	 * between the reader and a question they have not read yet; asked last, it
+	 * is the answer they reach for having decided the box above is not for
+	 * them.
+	 */
+	optional?: {
+		/** The toggle under the box, e.g. "We don't want a bet". */
+		decline: string;
+		/** Printed once BOTH sides have declined, e.g. "No bet. Just pride." */
+		none: string;
+	};
+	/**
+	 * Fields sharing a group render as one card, in declaration order.
+	 *
+	 * Primary and secondary colours are one decision made twice, not two
+	 * decisions: split across two cards they read as unrelated questions and
+	 * the pair is impossible to judge, which is the only way to pick a
+	 * secondary. The first field of a group supplies the card's tag, prompt
+	 * and help; every field supplies its own row label from `short`.
+	 */
+	group?: string;
 };
 
 export type Question =

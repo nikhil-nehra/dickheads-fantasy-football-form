@@ -1,4 +1,5 @@
 import { norm } from './text';
+import { parseMoney } from './money';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    AGREEMENT IS DERIVED, NEVER STORED
@@ -20,7 +21,7 @@ export type Entry = { field_key: string; proposal: string | null; pick: string |
 export type Ruling = { field_key: string; value: string };
 
 /* ── "We agreed there isn't one" ──────────────────────────────────────────────
-   A bet and a side punishment are both OPTIONAL, and two people deciding to
+   A bet and a side forfeit are both OPTIONAL, and two people deciding to
    have neither is a settled outcome — not an unanswered question. Those are
    different things and the board says so differently, so they cannot share the
    empty state.
@@ -36,6 +37,28 @@ export const NONE = 'None';
 
 export function isNone(value: string | null | undefined): boolean {
 	return value !== null && value !== undefined && norm(value) === norm(NONE);
+}
+
+/**
+ * Does what somebody left in the box amount to "there isn't one"?
+ *
+ * On a line that can be declined, an empty box and a bet of zero are not
+ * half-finished answers — they are the answer, and the same one the switch
+ * gives. Stored as a blank instead, they reach the board as "not set", which
+ * reads as two people who never got round to it rather than two people who
+ * decided against it.
+ *
+ * A line that CANNOT be declined has no such reading: emptying a rivalry name
+ * means you are still thinking about the name, and there is no "no name".
+ */
+export function readsAsNone(
+	value: string,
+	opts: { optional?: boolean; money?: boolean } = {}
+): boolean {
+	if (!opts.optional) return false;
+	const v = value.trim();
+	if (!v) return true;
+	return !!opts.money && parseMoney(v) === 0;
 }
 
 export type FieldState = {
@@ -102,6 +125,23 @@ export function pairFieldStatus(
 	return fieldStatus(fieldKey, aEntries, bEntries, rulings);
 }
 
+/* ── Lines with nothing to agree ──────────────────────────────────────────────
+   Team colours share the table but not the mechanic. Your colours are yours,
+   your rival's are theirs, and the Rivalry Board wants both — so there is no
+   pair to compare and no state to derive. Agreement here would be the WRONG
+   outcome: two teams in the same red is the one result the header cannot draw.
+
+   They live in `negotiation_entry` anyway, and that is the whole point: your
+   rival's answer is already loaded next to yours, so you can see what they
+   picked BEFORE you pick against them. Nothing else on the site gives you a
+   view of one specific other player's answer.
+
+   `pick` holds the value; `proposal` is unused, because proposing a colour to
+   somebody who does not get a vote is not a thing. */
+export function ownValue(fieldKey: string, entries: Entry[]): string | null {
+	return clean(find(entries, fieldKey)?.pick);
+}
+
 export const STATE_LABEL: Record<FieldState['state'], string> = {
 	forced: "Commissioner's ruling",
 	agreed: 'Agreed',
@@ -117,8 +157,12 @@ export const STATE_LABEL: Record<FieldState['state'], string> = {
  *
  * Settled rather than disputed is the deliberate choice: an argument is not a
  * rivalry, a signed bet is. A pair who have agreed a name, a bet AND a side
- * punishment are locked in and get the hardest clash; a pair who have agreed
+ * forfeit are locked in and get the hardest clash; a pair who have agreed
  * nothing sit perfectly still, and the stillness is the nag.
+ *
+ * Team colours are not counted, and cannot be: an 'own' line has nothing to
+ * settle, so counting it would hand every pair two free points for answering
+ * a question they could not have got wrong.
  */
 export function heatFrom(settled: number): number {
 	return Math.max(0, Math.min(3, settled));

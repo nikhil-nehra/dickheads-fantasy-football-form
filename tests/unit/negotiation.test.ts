@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fieldStatus, heatFrom, type Entry } from '../../src/lib/negotiation';
+import { fieldStatus, heatFrom, readsAsNone, type Entry } from '../../src/lib/negotiation';
 
 /**
  * The rivalry mechanic. Agreement is DERIVED from two independently-written
@@ -117,5 +117,42 @@ describe('heatFrom', () => {
 
 	it('never goes negative', () => {
 		expect(heatFrom(-1)).toBe(0);
+	});
+});
+
+describe('an emptied box on a line that can be declined', () => {
+	/* The switch is one way to say "there isn't one". Clearing the box is the
+	   other, and a bet of zero is the third — all three have to land on the same
+	   stored answer or the board reports "not set" for a pair who decided. */
+	const bet = { optional: true, money: true };
+	const forfeit = { optional: true, money: false };
+	const name = { optional: false, money: false };
+
+	it('reads an empty box as declining', () => {
+		expect(readsAsNone('', forfeit)).toBe(true);
+		expect(readsAsNone('   ', forfeit)).toBe(true);
+	});
+
+	it('reads a zero bet as declining, however it is typed', () => {
+		for (const zero of ['0', '0.00', '$0', ' $0 ']) {
+			expect(readsAsNone(zero, bet), zero).toBe(true);
+		}
+	});
+
+	it('leaves a real answer alone', () => {
+		expect(readsAsNone('20', bet)).toBe(false);
+		expect(readsAsNone('0.01', bet)).toBe(false);
+		expect(readsAsNone('Loser buys the wings', forfeit)).toBe(false);
+	});
+
+	it('never reads "0" as declining on a line that is not money', () => {
+		// "0" is a strange forfeit, but it is a forfeit somebody typed.
+		expect(readsAsNone('0', forfeit)).toBe(false);
+	});
+
+	it('never declines a line that cannot be declined', () => {
+		// There is no "no rivalry name" — an empty box is somebody still thinking.
+		expect(readsAsNone('', name)).toBe(false);
+		expect(readsAsNone('0', name)).toBe(false);
 	});
 });

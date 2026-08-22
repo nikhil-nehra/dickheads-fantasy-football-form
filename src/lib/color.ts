@@ -63,6 +63,21 @@ export function toHex({ r, g, b }: RGB): string {
 	return '#' + [r, g, b].map((v) => clamp255(v).toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * One canonical `#rrggbb` for a colour somebody typed, or null if it is not a
+ * colour at all.
+ *
+ * A team colour is stored as a string and compared as a string — by the header
+ * that asks whether two teams picked the same thing, and by the swatch grid
+ * asking which of its sixteen is selected. Without this, `#B3122F`, `#b3122f`
+ * and `b3122f` are three different colours to every one of those comparisons
+ * and the same colour to every human looking at them.
+ */
+export function normaliseHex(input: string | null | undefined): string | null {
+	const rgb = parseHex(input);
+	return rgb ? toHex(rgb) : null;
+}
+
 /* ── sRGB transfer ───────────────────────────────────────────────────────── */
 
 /** One channel, 0–255 gamma-encoded, to 0–1 linear light. */

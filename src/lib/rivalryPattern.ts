@@ -168,6 +168,26 @@ export function inksCollide(a: LCh, b: LCh): boolean {
 	return hueDistance(a.h, b.h) < 25 && Math.abs(a.L - b.L) < 12;
 }
 
+/**
+ * Would these two picks be indistinguishable on the finished header?
+ *
+ * The same question `rivalryPattern` answers for its own diagnostics, asked
+ * early enough to be worth something: in the survey, next to the swatch the
+ * other side already chose, while the person looking at it can still pick
+ * differently. Afterwards it is only a note on a header nobody can change.
+ *
+ * Both themes, because the reader's is not knowable and clashing in either one
+ * is clashing.
+ */
+export function colorsClash(a: string | null | undefined, b: string | null | undefined): boolean {
+	const ra = parseHex(a);
+	const rb = parseHex(b);
+	if (!ra || !rb) return false;
+	return (['light', 'dark'] as Theme[]).some((theme) =>
+		inksCollide(toLCh(resolveInk(ra, theme)), toLCh(resolveInk(rb, theme)))
+	);
+}
+
 /* ── The composition ─────────────────────────────────────────────────────── */
 
 const uri = (svg: string) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;

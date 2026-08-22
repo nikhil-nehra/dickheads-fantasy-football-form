@@ -3,7 +3,7 @@
 	import PinPad from '$lib/components/PinPad.svelte';
 	import SurveyTally from '$lib/components/SurveyTally.svelte';
 	import { STATUS_META, ALL_STATUSES } from '$lib/status';
-	import { fieldStatus } from '$lib/negotiation';
+	import { fieldStatus, ownValue } from '$lib/negotiation';
 	import { autoPair } from '$lib/pairing';
 	import { confidence } from '$lib/sleeperMatch';
 	import type { SurveyStatus } from '$lib/server/db';
@@ -80,7 +80,7 @@
 			: undefined
 	);
 
-	let negFields = $derived(
+	let rivalryFields = $derived(
 		(rivalrySurvey
 			? (allQuestions(rivalrySurvey.def).find((q) => q.type === 'negotiation') as
 					| NegotiationQuestion
@@ -88,6 +88,13 @@
 			: undefined
 		)?.fields ?? []
 	);
+
+	/* Only a line with two sides can stall, so only a line with two sides gets a
+	   ruling box. Forcing a value on an 'own' line would write one answer over
+	   a pair of them and hand both teams the same colour — the single outcome
+	   the header cannot draw. They are shown, not rulable. */
+	let negFields = $derived(rivalryFields.filter((f) => f.mode !== 'own'));
+	let ownFields = $derived(rivalryFields.filter((f) => f.mode === 'own'));
 
 	// Beef rankings feed the auto-pair suggestion.
 	let beef = $derived.by(() => {
@@ -440,6 +447,31 @@
 									</div>
 								</div>
 							{/each}
+
+							{#if ownFields.length}
+								<!-- Read-only, because there is nothing here to settle: two
+								     sets of colours that both stand. Worth showing anyway —
+								     a pair who have both picked nothing is a pair whose card
+								     on the board is two greys. -->
+								<div class="line">
+									<div class="line-head">
+										<span class="down-tag">Team colors</span>
+									</div>
+									{#each [{ name: p.aName, id: p.a }, { name: p.bName, id: p.b }] as side (side.id)}
+										<p class="faint">
+											{side.name}:
+											{#each ownFields as f (f.key)}
+												{@const hex = ownValue(f.key, entriesFor(p.id, side.id))}
+												{#if hex}
+													<span class="swatch" style="--c:{hex}"></span>{hex}{' '}
+												{:else}
+													<span>— </span>
+												{/if}
+											{/each}
+										</p>
+									{/each}
+								</div>
+							{/if}
 						</div>
 					{/each}
 				{/if}
@@ -987,6 +1019,19 @@
 		border-radius: var(--r-md);
 		background: var(--surface-2);
 		border: 1px solid var(--border);
+	}
+
+	/* Named as well as shown — the Desk is read at a glance, and a bare square
+	   of colour does not survive being glanced at. */
+	.swatch {
+		display: inline-block;
+		width: 0.85em;
+		height: 0.85em;
+		vertical-align: -0.1em;
+		margin-right: 0.2em;
+		border-radius: 3px;
+		border: 1px solid var(--border-strong);
+		background: var(--c);
 	}
 
 	.line-head {

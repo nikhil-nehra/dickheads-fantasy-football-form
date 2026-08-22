@@ -232,7 +232,7 @@
 				{#if submitting}
 					Locking it in…
 				{:else if !valid && firstIssue}
-					{heckle(`${labelFor(firstIssue.question)} — ${firstIssue.message}`, firstIssue.question)}
+					{heckle(`${labelFor(firstIssue.question)}: ${firstIssue.message}`, firstIssue.question)}
 				{:else}
 					Everything checks out. Last chance to be sensible.
 				{/if}
