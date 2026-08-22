@@ -1,11 +1,10 @@
 <script lang="ts">
 	import '$lib/styles/app.css';
 	import { page } from '$app/state';
-	import { fade, fly } from 'svelte/transition';
-	import { BANNER, type Scope } from '$lib/voice';
-	import { reduced } from '$lib/motion';
+	import { fly } from 'svelte/transition';
+	import { BANNER, pick, type Scope } from '$lib/voice';
 
-	let { children } = $props();
+	let { children, data } = $props();
 
 	const LINKS = [
 		{ href: '/', label: 'Hub' },
@@ -16,26 +15,22 @@
 	/* The banner is one component wearing four hats. Which hat is decided by
 	   the route, not by page data, so it renders identically on the server
 	   before any load function has resolved. */
-	const CHROME: Record<Scope, { tag: string; title: [string, string]; stamp: string }> = {
+	const CHROME: Record<Scope, { tag: string; title: [string, string] }> = {
 		hub: {
 			tag: "THE DICKHEAD'S LEAGUE · 2026",
-			title: ["The Dickhead's", 'League Hub'],
-			stamp: 'LEAGUE\nBUSINESS'
+			title: ["The Dickhead's", 'League Hub']
 		},
 		survey: {
 			tag: 'DRAFT SEASON · 2026',
-			title: ["The Dickhead's", 'Fantasy Football Form'],
-			stamp: 'OFFICIAL\nLEAGUE FORM'
+			title: ["The Dickhead's", 'Fantasy Football Form']
 		},
 		board: {
 			tag: 'THE BOARDS · ALWAYS ON',
-			title: ["The Dickhead's", 'League Boards'],
-			stamp: 'PUBLIC\nRECORD'
+			title: ["The Dickhead's", 'League Boards']
 		},
 		desk: {
 			tag: "COMMISSIONER'S DESK · RESTRICTED",
-			title: ['The Commissioner’s', 'Desk'],
-			stamp: 'EYES\nONLY'
+			title: ['The Commissioner’s', 'Desk']
 		}
 	};
 
@@ -50,26 +45,19 @@
 	);
 
 	let chrome = $derived(CHROME[scope]);
-	let lines = $derived(BANNER[scope]);
 
-	/* Index 0 is what the server renders, so the first paint and the first
-	   hydrated frame always agree. Rotation starts a beat later, on a timer. */
-	let lineIndex = $state(0);
+	/* The heckle used to be a subtitle that crossfaded to the next line every
+	   seven seconds — a sentence that moved out from under you mid-read, and
+	   the reason the banner reserved three empty ems for it. It is now the
+	   stamp in the corner, which is where the joke belonged: something the
+	   commissioner slapped on the page rather than a caption.
 
-	$effect(() => {
-		const pool = lines;
-		lineIndex = 0;
-
-		// Text that changes on its own is motion too — readers who asked for
-		// less of it get the first line and nothing more.
-		if (reduced() || pool.length < 2) return;
-
-		const id = setInterval(() => {
-			lineIndex = (lineIndex + 1) % pool.length;
-		}, 7000);
-
-		return () => clearInterval(id);
-	});
+	   One line per document. The seed comes from the server (see
+	   +layout.server.ts) so the two renders agree, and it only changes when
+	   the page is reloaded — clicking around the site does not reroll it. The
+	   scope is mixed into the key so the four pools do not all land on the
+	   same index for a given seed. */
+	let heckle = $derived(pick(BANNER[scope], `${data.stampSeed}:${scope}`));
 
 	function current(href: string): boolean {
 		if (href === '/') return page.url.pathname === '/';
@@ -95,19 +83,25 @@
 			<!-- Decorative: the wordmark beside it says the same thing, and the
 			     crest's own lettering is unreadable at this size anyway. -->
 			<img class="crest" src="/logo-160.png" alt="" width="160" height="160" fetchpriority="high" />
-			<h1>{chrome.title[0]}<br />{chrome.title[1]}</h1>
+
+			<!-- Shrink-wrapped around the lettering so the stamp can hang off
+			     where the words actually end, not off the column's right edge —
+			     the titles are two and three lines long and end in different
+			     places. -->
+			<div class="wordmark">
+				<h1>{chrome.title[0]}<br />{chrome.title[1]}</h1>
+
+				<!-- Not aria-hidden, unlike the LEAGUE BUSINESS block it
+				     replaces: this one carries the only prose in the header, so
+				     it has to be readable by something other than eyes. -->
+				<p
+					class="stamp stamp--heckle stamp--boil"
+					style="--boil-1:url('#boil-a'); --boil-2:url('#boil-b'); --boil-3:url('#boil-c')"
+				>
+					{heckle}
+				</p>
+			</div>
 		</div>
-
-		<!-- Keyed so each new line crossfades in rather than swapping. The
-		     reserved min-height on .sub stops the header jumping when a longer
-		     line follows a shorter one. -->
-		<p class="sub">
-			{#key lineIndex}
-				<span in:fade={{ duration: 320 }}>{lines[lineIndex]}</span>
-			{/key}
-		</p>
-
-		<span class="stamp stamp--corner" aria-hidden="true">{chrome.stamp}</span>
 	</div>
 </header>
 
@@ -128,8 +122,38 @@
 	</div>
 </footer>
 
+<!-- The boil. Three noise fields, identical but for their seed; the stamp
+     flips between them a few times a second, so its border and lettering
+     crawl the way a hand-inked line does when it is redrawn every frame.
+     Kept here rather than in a component because a filter has to live in the
+     document to be referenced by url(#id), and the banner is the only thing
+     that uses it. -->
+<svg class="boil-defs" aria-hidden="true" focusable="false" width="0" height="0">
+	<filter id="boil-a" x="-6%" y="-16%" width="112%" height="132%" color-interpolation-filters="sRGB">
+		<feTurbulence type="fractalNoise" baseFrequency="0.021 0.038" numOctaves="2" seed="2" result="n" />
+		<feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G" />
+	</filter>
+	<filter id="boil-b" x="-6%" y="-16%" width="112%" height="132%" color-interpolation-filters="sRGB">
+		<feTurbulence type="fractalNoise" baseFrequency="0.021 0.038" numOctaves="2" seed="9" result="n" />
+		<feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G" />
+	</filter>
+	<filter id="boil-c" x="-6%" y="-16%" width="112%" height="132%" color-interpolation-filters="sRGB">
+		<feTurbulence type="fractalNoise" baseFrequency="0.021 0.038" numOctaves="2" seed="17" result="n" />
+		<feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G" />
+	</filter>
+</svg>
+
 <style>
 	main:focus {
 		outline: none;
+	}
+
+	/* Present only to hold the filters. Not display:none — Safari drops
+	   filters defined inside a hidden subtree. */
+	.boil-defs {
+		position: absolute;
+		width: 0;
+		height: 0;
+		overflow: hidden;
 	}
 </style>

@@ -22,6 +22,28 @@ export type ShowIf =
 	| { question: string; equals: string }
 	| { question: string; answered: true };
 
+/**
+ * Where an answer ends up once it leaves the tally.
+ *
+ * Half of what this league asks is asked in order to decide something else:
+ * the punishment ballot pre-fills the ruling, the prize allocation is the
+ * opening offer on the pot split, the beef ranking becomes the pairings. On
+ * the Desk those destinations are all a tab away from the numbers that
+ * produced them, and there was nothing on either end saying so — the results
+ * looked inert and the editors looked like they had been typed from nowhere.
+ *
+ * Declared here rather than inferred, because "this feeds that" is a fact
+ * about the league's process, not about the question's type.
+ */
+export type Feed = {
+	/** What it feeds, in words. e.g. "The Pot split". */
+	label: string;
+	/** Where to go and look, if there is somewhere. */
+	href?: string;
+	/** Which Desk tab does the deciding, so the Desk can offer a jump. */
+	deskTab?: 'control' | 'rivalries' | 'punishment' | 'pot' | 'sleeper';
+};
+
 type Base = {
 	id: string;
 	prompt: string;
@@ -29,6 +51,8 @@ type Base = {
 	help?: string;
 	required?: boolean;
 	showIf?: ShowIf;
+	/** Everything this answer is used for outside its own tally. */
+	feeds?: Feed[];
 };
 
 export type Choice = { id: string; label: string; sub?: string; icon?: IconName };

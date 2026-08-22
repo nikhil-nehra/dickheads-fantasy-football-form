@@ -1,9 +1,11 @@
-import { norm } from './text';
+import { norm, ordinal } from './text';
 import type {
 	AllocationQuestion,
 	AvailabilityQuestion,
 	BallotQuestion,
+	MultiQuestion,
 	Question,
+	RankQuestion,
 	SingleQuestion
 } from './surveys/types';
 
@@ -54,6 +56,91 @@ export function singleTally(q: SingleQuestion, subs: Submission[]): Count[] {
 	return [...counts.entries()]
 		.map(([id, n]) => ({ id, label: labels.get(id) ?? id, n, pct: pct(n, total) }))
 		.sort((a, b) => b.n - a.n || a.label.localeCompare(b.label));
+}
+
+/**
+ * Ticks per option for a multi-select question.
+ *
+ * The percentage is a share of the PEOPLE who answered, not of the ticks cast:
+ * on a question where everyone checks three boxes, share-of-ticks makes an
+ * option the whole room picked look like a third of the room.
+ */
+export function multiTally(q: MultiQuestion, subs: Submission[]): Count[] {
+	const counts = new Map<string, number>();
+	const labels = new Map<string, string>(q.options.map((o) => [o.id, o.label]));
+	let answered = 0;
+
+	for (const s of subs) {
+		const v = s.answers[q.id] as { choices?: string[] } | undefined;
+		const choices = v?.choices;
+		if (!Array.isArray(choices) || choices.length === 0) continue;
+		answered++;
+		// Deduped so a malformed answer cannot vote twice for one option.
+		for (const id of new Set(choices)) {
+			counts.set(id, (counts.get(id) ?? 0) + 1);
+		}
+	}
+
+	return [...counts.entries()]
+		.map(([id, n]) => ({ id, label: labels.get(id) ?? id, n, pct: pct(n, answered) }))
+		.sort((a, b) => b.n - a.n || a.label.localeCompare(b.label));
+}
+
+export type RankResult = Count & { points: number; firsts: number; avg: number };
+
+/**
+ * A ranked ladder, added up.
+ *
+ * Borda: the top of a ladder of n is worth n points, the next n−1, and so on
+ * down to 1. On a roster ranking every ladder is the same length — `excludeSelf`
+ * takes exactly one name off each — so this is a straight vote, and a partial
+ * ladder simply hands out fewer points rather than breaking the sum.
+ *
+ * `avg` is the plain-language read, and the one the Desk prints beside the bar:
+ * mean finishing position among the people who ranked them. "2.4th on average"
+ * is a sentence about the league. "41 points" is a sentence about the tally.
+ *
+ * `labelOf` names roster ids; a fixed source names itself and wins over it.
+ */
+export function rankTally(
+	q: RankQuestion,
+	subs: Submission[],
+	labelOf: Map<string, string> = new Map()
+): RankResult[] {
+	const points = new Map<string, number>();
+	const firsts = new Map<string, number>();
+	const places = new Map<string, number[]>();
+
+	for (const s of subs) {
+		const order = s.answers[q.id];
+		if (!Array.isArray(order) || order.length === 0) continue;
+		const n = order.length;
+		(order as string[]).forEach((id, i) => {
+			points.set(id, (points.get(id) ?? 0) + (n - i));
+			places.set(id, [...(places.get(id) ?? []), i + 1]);
+			if (i === 0) firsts.set(id, (firsts.get(id) ?? 0) + 1);
+		});
+	}
+
+	const most = Math.max(1, ...points.values());
+	const fixed = new Map<string, string>(
+		q.source.kind === 'fixed' ? q.source.options.map((o) => [o.id, o.label]) : []
+	);
+
+	return [...points.entries()]
+		.map(([id, p]) => {
+			const at = places.get(id) ?? [];
+			return {
+				id,
+				label: fixed.get(id) ?? labelOf.get(id) ?? id,
+				n: at.length,
+				pct: pct(p, most),
+				points: p,
+				firsts: firsts.get(id) ?? 0,
+				avg: at.length ? Math.round((at.reduce((a, b) => a + b, 0) / at.length) * 10) / 10 : 0
+			};
+		})
+		.sort((a, b) => b.points - a.points || b.firsts - a.firsts || a.label.localeCompare(b.label));
 }
 
 export type BallotResult = Count & { firsts: number; points: number };
@@ -179,8 +266,6 @@ export type AllocationResult = {
 	abstained: number;
 };
 
-const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
-
 /**
  * The crowd's average split. Averaged over people who expressed a preference,
  * then rounded to the nearest step with the remainder pushed onto first place
@@ -221,7 +306,7 @@ export function allocationAverage(q: AllocationQuestion, subs: Submission[]): Al
 	return {
 		buckets: buckets
 			.filter((p) => p > 0)
-			.map((p, i) => ({ label: `${ORDINALS[i] ?? `${i + 1}th`} ${q.bucketNoun}`, pct: p })),
+			.map((p, i) => ({ label: `${ordinal(i + 1)} ${q.bucketNoun}`, pct: p })),
 		carveOut: q.carveOut && carve > 0 ? { label: q.carveOut.label, pct: carve } : null,
 		respondents: filled.length,
 		abstained

@@ -32,6 +32,7 @@ export const intake: SurveyDefinition = {
 					prompt: "How much should the buy-in be?",
 					required: true,
 					layout: 'chips',
+					feeds: [{ label: 'The Pot — the buy-in', href: '/b/pot', deskTab: 'pot' }],
 					// Ids are the dollar amounts so `amountFrom` can read them directly.
 					options: [
 						{ id: '25', label: '$25' },
@@ -114,6 +115,7 @@ export const intake: SurveyDefinition = {
 					id: 'beef',
 					type: 'rank',
 					prompt: 'Rivalry Selection',
+					feeds: [{ label: 'Rivalry pairings — the suggested draw', deskTab: 'rivalries' }],
 					help:
 						'This is for **rivalry week** (the last week of the season) — there may even be a mini group punishment or payout for the losing side of each rivalry. ' +
 						'Who do you have the most beef with, or want to beat the most? Drag by the ⠿ handle to rank.',
@@ -135,6 +137,7 @@ export const intake: SurveyDefinition = {
 					id: 'prizeSplit',
 					type: 'allocation',
 					prompt: 'How should the prize pool be split?',
+					feeds: [{ label: 'The Pot — the payout split', href: '/b/pot', deskTab: 'pot' }],
 					help:
 						'Set how many places get paid and dial in each cut (5% steps) — you can also give the regular-season points leader a slice.',
 					required: false,

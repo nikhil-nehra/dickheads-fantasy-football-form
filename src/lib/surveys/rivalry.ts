@@ -75,6 +75,9 @@ export const rivalry: SurveyDefinition = {
 					id: 'podium',
 					type: 'ballot',
 					prompt: 'Rank your top 3 punishments',
+					feeds: [
+						{ label: 'The Punishment — the sentence', href: '/b/punishment', deskTab: 'punishment' }
+					],
 					help:
 						'Tap in order. First tap is your 1st choice, worth **3 points**, then 2, then 1. Missing yours? Write it in.',
 					required: true,
@@ -102,6 +105,9 @@ export const rivalry: SurveyDefinition = {
 					id: 'target',
 					type: 'single',
 					prompt: 'Who actually has to do the punishment?',
+					feeds: [
+						{ label: 'The Punishment — who does it', href: '/b/punishment', deskTab: 'punishment' }
+					],
 					help: 'The part everyone argues about in January. Settle it now.',
 					required: true,
 					layout: 'list',
@@ -143,6 +149,9 @@ export const rivalry: SurveyDefinition = {
 					type: 'negotiation',
 					prompt: 'Settle it',
 					required: false,
+					feeds: [
+						{ label: 'The Rivalry Board', href: '/b/rivalry', deskTab: 'rivalries' }
+					],
 					fields: [
 						{
 							key: 'rname',

@@ -4,6 +4,8 @@ import { rivalry } from '../../src/lib/surveys/rivalry';
 import { questionById } from '../../src/lib/surveys/types';
 import {
 	singleTally,
+	multiTally,
+	rankTally,
 	ballotTally,
 	textQuotes,
 	availabilityStats,
@@ -16,6 +18,8 @@ import type {
 	AllocationQuestion,
 	AvailabilityQuestion,
 	BallotQuestion,
+	MultiQuestion,
+	RankQuestion,
 	SingleQuestion
 } from '../../src/lib/surveys/types';
 
@@ -24,6 +28,22 @@ const availability = questionById(intake, 'availability') as AvailabilityQuestio
 const prize = questionById(intake, 'prizeSplit') as AllocationQuestion;
 const podium = questionById(rivalry, 'podium') as BallotQuestion;
 const target = questionById(rivalry, 'target') as SingleQuestion;
+const beef = questionById(intake, 'beef') as RankQuestion;
+
+/* No survey ships a multi-select yet, so the type's tally is exercised against
+   a definition written here. It is the registry's job to decide what the
+   league is asked; it is this file's job to make sure a new question type is
+   summarised the moment somebody asks it. */
+const sides: MultiQuestion = {
+	id: 'sides',
+	type: 'multi',
+	prompt: 'Which of these are you in for?',
+	options: [
+		{ id: 'chili', label: 'Chili cook-off' },
+		{ id: 'jersey', label: 'Jersey week' },
+		{ id: 'burger', label: 'Burger challenge' }
+	]
+};
 
 const sub = (playerId: string, answers: Record<string, unknown>): Submission => ({
 	playerId,
@@ -75,6 +95,117 @@ describe('single-choice tallies', () => {
 
 	it('returns nothing for no submissions', () => {
 		expect(singleTally(buyIn, [])).toEqual([]);
+	});
+});
+
+describe('multi-select tallies', () => {
+	it('counts a tick per option', () => {
+		const rows = multiTally(sides, [
+			sub('a', { sides: { choices: ['chili', 'jersey'] } }),
+			sub('b', { sides: { choices: ['chili'] } })
+		]);
+		expect(rows[0]).toMatchObject({ id: 'chili', n: 2, pct: 100 });
+		expect(rows[1]).toMatchObject({ id: 'jersey', n: 1, pct: 50 });
+	});
+
+	// Share of PEOPLE, not of ticks: everyone ticking everything is unanimity
+	// on all three, not 33% each.
+	it('reads percentages as a share of the people who answered', () => {
+		const all = ['chili', 'jersey', 'burger'];
+		const rows = multiTally(sides, [
+			sub('a', { sides: { choices: all } }),
+			sub('b', { sides: { choices: all } })
+		]);
+		expect(rows.every((r) => r.pct === 100)).toBe(true);
+	});
+
+	it('does not let a duplicated choice vote twice', () => {
+		const rows = multiTally(sides, [sub('a', { sides: { choices: ['chili', 'chili'] } })]);
+		expect(rows[0].n).toBe(1);
+	});
+
+	it('skips empty and malformed answers', () => {
+		const rows = multiTally(sides, [
+			sub('a', { sides: { choices: [] } }),
+			sub('b', { sides: 'nope' }),
+			sub('c', {}),
+			sub('d', { sides: { choices: ['burger'] } })
+		]);
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).toMatchObject({ id: 'burger', n: 1, pct: 100 });
+	});
+});
+
+describe('ranked ladders', () => {
+	const names = new Map([
+		['a', 'Ada'],
+		['b', 'Bo'],
+		['c', 'Cy'],
+		['d', 'Dee']
+	]);
+
+	it('scores a ladder by Borda position', () => {
+		// A list of three: 3 points for the top, then 2, then 1.
+		const rows = rankTally(beef, [sub('a', { beef: ['b', 'c', 'd'] })], names);
+		expect(rows.map((r) => [r.id, r.points])).toEqual([
+			['b', 3],
+			['c', 2],
+			['d', 1]
+		]);
+	});
+
+	it('scores the bottom rung of any ladder at 1', () => {
+		const rows = rankTally(beef, [sub('a', { beef: ['b', 'c', 'd'] })], names);
+		expect(rows.at(-1)!.points).toBe(1);
+	});
+
+	/* Roster ladders are all the same length in practice — `excludeSelf` takes
+	   exactly one name off each — so this is a straight vote. A partial ladder
+	   still adds up; it just hands out fewer points, which is what a Borda
+	   count does with a short ballot. */
+	it('sums across ladders of different lengths', () => {
+		const rows = rankTally(
+			beef,
+			[sub('a', { beef: ['b'] }), sub('c', { beef: ['d', 'b', 'a'] })],
+			names
+		);
+		// Bo: 1 (top of one) + 2 (second of three). Dee: 3 (top of three).
+		expect(rows.find((r) => r.id === 'b')!.points).toBe(3);
+		expect(rows.find((r) => r.id === 'd')!.points).toBe(3);
+		expect(rows.find((r) => r.id === 'a')!.points).toBe(1);
+	});
+
+	it('reports average finishing position among the people who ranked them', () => {
+		const rows = rankTally(
+			beef,
+			[sub('a', { beef: ['b', 'c'] }), sub('d', { beef: ['c', 'b'] })],
+			names
+		);
+		// Both were ranked 1st once and 2nd once.
+		expect(rows.every((r) => r.avg === 1.5)).toBe(true);
+		expect(rows.every((r) => r.n === 2)).toBe(true);
+	});
+
+	it('breaks ties on first-place placements', () => {
+		const rows = rankTally(
+			beef,
+			[sub('a', { beef: ['b', 'c'] }), sub('d', { beef: ['c', 'b'] })],
+			names
+		);
+		expect(rows[0].firsts).toBe(1);
+		expect(rows).toHaveLength(2);
+	});
+
+	it('names roster ids and falls back to the id when nobody claims it', () => {
+		const rows = rankTally(beef, [sub('a', { beef: ['b', 'ghost'] })], names);
+		expect(rows[0].label).toBe('Bo');
+		expect(rows[1].label).toBe('ghost');
+	});
+
+	it('ignores a malformed or empty ladder', () => {
+		expect(rankTally(beef, [sub('a', { beef: 'nope' }), sub('b', { beef: [] })], names)).toEqual(
+			[]
+		);
 	});
 });
 

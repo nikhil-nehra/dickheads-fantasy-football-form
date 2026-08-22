@@ -473,6 +473,10 @@ img {
 	display: flex;
 	align-items: center;
 	gap: var(--s-4);
+	/* Containing block for the splash stamp. This box — not the shrink-wrapped
+	   .wordmark inside it — is what the stamp anchors to, because its right edge
+	   is the column edge the nav pills above are flush with. */
+	position: relative;
 }
 
 .crest {
@@ -492,19 +496,8 @@ img {
 	text-shadow: 0 2px 0 rgb(0 0 0 / 25%);
 }
 
-.banner .sub {
-	color: var(--on-field-dim);
-	font-size: var(--t-sm);
-	margin-top: var(--s-2);
-	max-width: 46ch;
-	/* Two lines reserved. The rotating one-liners differ in length, and
-	   without this the whole banner steps up and down every seven seconds. */
-	min-height: 3em;
-	/* Keeps the line clear of the corner stamp, which is absolutely positioned
-	   over this same corner. */
-	padding-right: 100px;
-	opacity: 0.88;
-}
+/* The banner's rotating subtitle used to live here. It is now the corner
+   stamp — see .stamp--heckle. */
 
 .nav {
 	display: flex;
@@ -595,10 +588,88 @@ img {
 	pointer-events: none;
 }
 
-.stamp--corner {
-	position: absolute;
-	right: 0;
-	bottom: 0;
+/* The header heckle. A whole sentence, so it cannot be the 10px two-word
+   block the other stamps are.
+
+   Base layer is the narrow-screen one: in normal flow, right-aligned under the
+   wordmark, nothing overlapping anything. The splash placement is layered on
+   in the media query below, where there is provably room for it.
+
+   Gold, not --danger: the banner is navy in both themes, and #a32638 on navy
+   is about 2:1. The other stamps sit on cards that follow the theme and can
+   stay red. */
+.stamp--heckle {
+	display: block;
+	width: fit-content;
+	max-width: min(100%, 42ch);
+	margin: var(--s-3) 0 0 auto;
+	border-color: rgb(240 194 66 / 70%);
+	color: var(--gold-bright);
+	background: rgb(240 194 66 / 7%);
+	font-size: 12px;
+	letter-spacing: 0.05em;
+	line-height: 1.5;
+	padding: var(--s-2) var(--s-3);
+	/* Text, not a caption: it wraps to as many lines as it needs and is read
+	   left to right, so it loses the -8deg the little stamps get. */
+	transform: rotate(-1.4deg);
+	white-space: normal;
+	text-wrap: balance;
+	/* .stamp turns pointer events off because the little ones are scenery.
+	   This one is a sentence, and a sentence you cannot select is annoying. */
+	pointer-events: auto;
+}
+
+/* Shrink-wrapped to the lettering. min-width:0 so the flex item is still
+   allowed to shrink below max-content when the crest and a long title are
+   fighting for the row. */
+.wordmark {
+	width: fit-content;
+	min-width: 0;
+}
+
+/* The splash placement. Minecraft hangs its splash off the lower-right corner
+   of the logo at an angle, half on and half off — this is that, with a stamp
+   instead of yellow text.
+
+   Gated at 760px because banner-inner caps at 680px: above that the room to
+   the right of the lettering is a known quantity and the overlap is safe, and
+   below it the base rule keeps the stamp in flow rather than letting it sit on
+   top of the title. */
+@media (min-width: 760px) {
+	.stamp--heckle {
+		position: absolute;
+		/* Hung off the bottom-right corner rather than the right-hand side:
+		   there is only ~200px to the right of the lettering, which forces a
+		   sentence into four cramped lines, but there is the whole width of
+		   the wordmark underneath it. */
+		top: 100%;
+		right: 0;
+		z-index: 1;
+		margin: -30px 0 0;
+		width: max-content;
+		max-width: 52ch;
+		font-size: 11px;
+		/* Balancing turns a one-line heckle into three stubby ones and makes the
+		   stamp a sticky note. Let it run long and flat instead. */
+		text-wrap: wrap;
+		transform: rotate(-5deg);
+		transform-origin: right top;
+		/* It is on top of 44px display type now. Transparent ink was fine when
+		   it sat in clear space; over the wordmark it needs something opaque
+		   under it or both the stamp and the title turn to soup. */
+		background: rgb(14 35 64 / 92%);
+		box-shadow: 0 6px 18px rgb(0 0 0 / 40%);
+	}
+
+	/* The stamp is out of flow, so nothing else reserves the room it hangs
+	   into. Without this it crosses the gold rule at the foot of the banner.
+	   On .banner-inner rather than .banner-head, because `top: 100%` resolves
+	   against the containing block's PADDING box — padding on .banner-head would
+	   push the stamp down by however much room it was given. */
+	.banner-inner {
+		padding-bottom: 46px;
+	}
 }
 
 .stamp--big {
@@ -613,6 +684,33 @@ img {
 /* The slam. Comes in oversized and off-axis, lands hard, settles. */
 .stamp--slam {
 	animation: slam var(--dur-4) var(--ease-out) both;
+}
+
+/* Line boil. Three noise fields defined in +layout.svelte, held for one frame
+   each at roughly 8fps, so the border and the lettering crawl the way ink does
+   when a line is redrawn by hand every frame. Nothing moves position — the
+   edges just refuse to sit still.
+
+   The filters arrive as custom properties set inline on the element rather
+   than as url(#id) written here, because a bare fragment in an external
+   stylesheet resolves against the stylesheet in some engines and against the
+   document in others. Declared inline, it is the document everywhere. The
+   `none` fallback means a .stamp--boil with no properties set is simply a
+   still stamp, not an unrendered one. */
+.stamp--boil {
+	animation: boil 360ms steps(1, end) infinite;
+}
+
+@keyframes boil {
+	0% {
+		filter: var(--boil-1, none);
+	}
+	33.34% {
+		filter: var(--boil-2, none);
+	}
+	66.67% {
+		filter: var(--boil-3, none);
+	}
 }
 
 /* ── Controls ──────────────────────────────────────────────────────────── */
